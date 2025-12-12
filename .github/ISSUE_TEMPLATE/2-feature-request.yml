@@ -1,0 +1,85 @@
+name: Feature Request
+description: Suggest an enhancement or new feature for WarPie
+title: "[Feature]: "
+labels: ["enhancement", "feature-request"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting a feature! Please provide detailed information.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem Statement
+      description: What problem does this feature solve? What limitation exists?
+      placeholder: |
+        Currently, there's no way to...
+        Users must manually...
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed Solution
+      description: Describe how you would like this feature to work
+      placeholder: |
+        Add a feature that...
+        The workflow would be...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives Considered
+      description: Other approaches or workarounds you've considered
+      placeholder: |
+        1. Using X instead - but this doesn't work because...
+        2. Manual workaround - but this is tedious...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: complexity
+    attributes:
+      label: Estimated Complexity
+      description: How complex do you think this feature is?
+      options:
+        - Simple (minor changes, 1-2 hours)
+        - Medium (moderate changes, 4-8 hours)
+        - Complex (significant work, 8+ hours)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority Suggestion
+      description: How important is this feature to you?
+      options:
+        - Low (nice to have)
+        - Medium (would improve workflow)
+        - High (blocks critical work)
+    validations:
+      required: true
+
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation Notes
+      description: Any technical details or research that would help
+      placeholder: Could leverage existing X, similar to how Y works...
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: contribution
+    attributes:
+      label: Contribution
+      options:
+        - label: I'm willing to implement this feature
+          required: false
+        - label: I'm willing to help test this feature
+          required: false

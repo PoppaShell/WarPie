@@ -1,0 +1,64 @@
+name: Documentation
+description: Request documentation updates or improvements
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve WarPie documentation by reporting gaps, errors, or unclear sections.
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Documentation Type
+      description: What kind of documentation work is this?
+      options:
+        - New documentation
+        - Update existing documentation
+        - Fix documentation error
+        - Improve clarity or examples
+    validations:
+      required: true
+
+  - type: textarea
+    id: what
+    attributes:
+      label: What needs documentation?
+      description: Describe the topic or feature that needs documentation
+      placeholder: |
+        - The network filtering workflow is not explained
+        - GPS configuration steps are missing
+        - Installation instructions are unclear
+    validations:
+      required: true
+
+  - type: textarea
+    id: where
+    attributes:
+      label: Where should this go?
+      description: |
+        Suggest where this documentation should be located.
+
+        Common locations:
+        - README.md (overview, quick start)
+        - docs/guides/ (how-to guides)
+        - docs/architecture/ (design docs)
+      placeholder: |
+        - docs/guides/network-filtering.md (new file)
+        - README.md (add section)
+    validations:
+      required: true
+
+  - type: textarea
+    id: content
+    attributes:
+      label: Proposed Content
+      description: If you have ideas about what should be included, share them here
+      placeholder: |
+        ## Network Filtering
+        1. Overview of exclusion types
+        2. CLI usage examples
+        3. Configuration file format
+    validations:
+      required: false

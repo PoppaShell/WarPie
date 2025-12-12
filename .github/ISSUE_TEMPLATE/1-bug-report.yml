@@ -1,0 +1,117 @@
+name: Bug Report
+description: Report a bug or unexpected behavior in WarPie
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve WarPie! Please provide as much detail as possible.
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      options:
+        - label: I have searched existing issues and found no duplicates
+          required: true
+        - label: I can provide relevant logs or screenshots
+          required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: A clear and concise description of the bug
+      placeholder: Describe what is happening...
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: Detailed steps to consistently reproduce the issue
+      placeholder: |
+        1. Start WarPie with...
+        2. Navigate to...
+        3. Click on...
+        4. Observe...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should happen instead?
+      placeholder: The system should...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happens?
+      placeholder: Instead, the system...
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How critically does this bug impact WarPie?
+      options:
+        - Critical (system crash, data loss, complete failure)
+        - High (major functionality broken)
+        - Medium (feature partially broken, workaround available)
+        - Low (minor issue, cosmetic)
+    validations:
+      required: true
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which part of WarPie is affected?
+      options:
+        - Kismet Capture
+        - GPS Tracking
+        - WiFi Adapters
+        - Web Control Panel
+        - Network Management
+        - CLI Tools
+        - Installation/Setup
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: System and hardware configuration
+      placeholder: |
+        **Hardware:**
+        - Raspberry Pi Model: Pi 4B (4GB)
+        - Primary WiFi: AWUS036AXML
+        - Secondary WiFi: RT3070
+        - GPS: GlobalSat BU-353S4
+
+        **Software:**
+        - WarPie Version: v2.4.x
+        - Kismet Version: (kismet --version)
+        - OS: Raspberry Pi OS Bookworm
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs
+      description: Paste any error messages or relevant logs
+      render: shell
+    validations:
+      required: false

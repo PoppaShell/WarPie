@@ -1,0 +1,89 @@
+name: Enhancement
+description: Suggest an improvement to existing functionality
+title: "[Enhancement]: "
+labels: ["enhancement", "improvement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for suggesting an enhancement! Please describe the improvement.
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current Behavior
+      description: How does the system currently work? What is the limitation?
+      placeholder: Currently, the web interface only displays...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed
+    attributes:
+      label: Proposed Improvement
+      description: What enhancement would you like to see?
+      placeholder: |
+        Add the ability to...
+        Improve X by...
+    validations:
+      required: true
+
+  - type: textarea
+    id: benefits
+    attributes:
+      label: Benefits
+      description: What are the advantages of this enhancement?
+      placeholder: |
+        - Users can...
+        - Reduces time spent on...
+        - Improves reliability of...
+    validations:
+      required: false
+
+  - type: textarea
+    id: drawbacks
+    attributes:
+      label: Potential Drawbacks
+      description: Are there any downsides or considerations?
+      placeholder: |
+        - May increase resource usage
+        - Could affect existing behavior
+    validations:
+      required: false
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area of Enhancement
+      description: Which aspect of WarPie does this affect?
+      options:
+        - Performance
+        - User Experience
+        - Code Quality
+        - Documentation
+        - Security
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: breaking
+    attributes:
+      label: Breaking Change
+      description: Will this change break existing functionality?
+      options:
+        - "No"
+        - "Yes"
+        - "Unsure"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: verification
+    attributes:
+      label: Verification
+      options:
+        - label: I have tested this approach or validated the concept
+          required: false
+        - label: This enhancement affects existing functionality
+          required: false
