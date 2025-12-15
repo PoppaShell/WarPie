@@ -24,6 +24,8 @@ A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, GP
 
 ## Quick Start
 
+For detailed installation instructions, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
+
 ```bash
 # Copy install.sh to your Pi
 scp install.sh pi@warpie:~/
@@ -126,6 +128,8 @@ This lets you:
 
 ## Troubleshooting
 
+For detailed troubleshooting, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
+
 ### GPS Not Working
 ```bash
 # Check GPS device
@@ -176,6 +180,15 @@ sudo warpie-recovery.sh
 
 Kismet creates WiGLE-compatible CSV files in `/home/pi/kismet/`. Upload these to [wigle.net](https://wigle.net) to contribute to the wireless network database.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [INSTALLATION.md](docs/INSTALLATION.md) | Detailed setup guide |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Diagnostic procedures |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
+| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Field reference card |
+
 ## Project Structure
 
 ```
@@ -185,7 +198,6 @@ Kismet creates WiGLE-compatible CSV files in `/home/pi/kismet/`. Upload these to
 /usr/local/etc/                 # Kismet configs
   kismet_site.conf              # Main config + exclusions
   kismet_wardrive.conf          # Wardrive mode
-  kismet_.conf       #  targeting
 
 /usr/local/bin/                 # Scripts
   network-manager.sh            # AP/client switching
