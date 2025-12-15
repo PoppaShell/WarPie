@@ -1225,11 +1225,7 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
     def call_filter_script(self, *args):
         """Call the filter manager script with arguments and return JSON result"""
         # Use new filter manager if available, otherwise fall back to old script
-        script = (
-            FILTER_MANAGER_SCRIPT
-            if Path(FILTER_MANAGER_SCRIPT).exists()
-            else EXCLUDE_SCRIPT
-        )
+        script = FILTER_MANAGER_SCRIPT if Path(FILTER_MANAGER_SCRIPT).exists() else EXCLUDE_SCRIPT
         try:
             cmd = ["sudo", script, "--json"] + list(args)
             result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
@@ -1437,9 +1433,7 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
         if match:
             filter_type = match.group(1)
             value = match.group(2)
-            result = self.call_filter_script(
-                f"--remove-{filter_type}", "--ssid", value
-            )
+            result = self.call_filter_script(f"--remove-{filter_type}", "--ssid", value)
             self.send_json_response(result)
             return
 
