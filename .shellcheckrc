@@ -1,0 +1,24 @@
+# ShellCheck Configuration for WarPie
+# https://github.com/koalaman/shellcheck/wiki/Directive
+
+# Default shell dialect
+shell=bash
+
+# Minimum severity level: error, warning, info, style
+severity=warning
+
+# Enable all optional checks
+enable=all
+
+# Disable specific checks that don't apply to our use case
+# SC2034: Unused variables (common in sourced scripts and config)
+# SC1091: Not following sourced files (we source system files)
+# SC2155: Declare and assign separately (style preference)
+disable=SC2034,SC1091,SC2155
+
+# Source path for resolving source directives
+# Helps ShellCheck find sourced files
+source-path=SCRIPTDIR
+
+# External sources that ShellCheck can't verify
+external-sources=true

@@ -1,0 +1,39 @@
+# WarPie Development Dependencies
+# Install with: pip install -r requirements-dev.txt
+
+# =============================================================================
+# Linting & Formatting
+# =============================================================================
+ruff>=0.8.0                    # Python linter and formatter (replaces black, isort, flake8)
+
+# =============================================================================
+# Testing
+# =============================================================================
+pytest>=8.0.0                  # Python test framework
+pytest-cov>=4.1.0              # Coverage reporting for pytest
+pytest-mock>=3.12.0            # Mocking support for pytest
+responses>=0.25.0              # Mock HTTP requests for API testing
+
+# =============================================================================
+# Pre-commit Hooks
+# =============================================================================
+pre-commit>=3.6.0              # Git pre-commit hook framework
+
+# =============================================================================
+# Type Checking (Optional)
+# =============================================================================
+# mypy>=1.8.0                  # Static type checker (uncomment if needed)
+
+# =============================================================================
+# Documentation (Optional)
+# =============================================================================
+# mkdocs>=1.5.0                # Documentation generator (uncomment if needed)
+# mkdocs-material>=9.5.0       # Material theme for mkdocs
+
+# =============================================================================
+# Notes
+# =============================================================================
+# Bash tooling is installed separately:
+#   - shellcheck: apt install shellcheck OR brew install shellcheck
+#   - shfmt: go install mvdan.cc/sh/v3/cmd/shfmt@latest OR brew install shfmt
+#   - bats-core: apt install bats OR brew install bats-core

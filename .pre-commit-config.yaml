@@ -1,0 +1,97 @@
+# Pre-commit Configuration for WarPie
+# Install: pip install pre-commit && pre-commit install
+# Run manually: pre-commit run --all-files
+# https://pre-commit.com
+
+repos:
+  # =============================================================================
+  # General Hooks
+  # =============================================================================
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^\.claude/
+      - id: end-of-file-fixer
+        exclude: ^\.claude/
+      - id: check-yaml
+        args: [--unsafe]  # Allow custom YAML tags
+      - id: check-json
+      - id: check-toml
+      - id: check-added-large-files
+        args: [--maxkb=500]
+      - id: check-merge-conflict
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # =============================================================================
+  # Python - Ruff (Linting + Formatting)
+  # =============================================================================
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.0
+    hooks:
+      # Linter
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        types_or: [python, pyi]
+      # Formatter
+      - id: ruff-format
+        types_or: [python, pyi]
+
+  # =============================================================================
+  # Bash - ShellCheck (Linting)
+  # =============================================================================
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
+    hooks:
+      - id: shellcheck
+        args: [--severity=warning]
+        types: [shell]
+
+  # =============================================================================
+  # Bash - shfmt (Formatting)
+  # =============================================================================
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.8.0-1
+    hooks:
+      - id: shfmt
+        args:
+          - -i
+          - "4"      # 4-space indentation
+          - -ci      # Indent switch cases
+          - -bn      # Binary ops may start a line
+          - -sr      # Redirect operators followed by space
+        types: [shell]
+
+  # =============================================================================
+  # Markdown
+  # =============================================================================
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.42.0
+    hooks:
+      - id: markdownlint
+        args: [--fix, --disable, MD013, MD033, MD041, --]
+        exclude: ^(\.claude/|CHANGELOG\.md)
+
+# =============================================================================
+# JavaScript - ESLint (Linting embedded JS in Python)
+# =============================================================================
+  - repo: local
+    hooks:
+      - id: eslint-embedded
+        name: ESLint (embedded JavaScript)
+        entry: bash -c 'node scripts/extract-js.js && npx eslint .extracted-js/'
+        language: system
+        files: \.py$
+        pass_filenames: false
+
+# =============================================================================
+# CI Configuration
+# =============================================================================
+ci:
+  autofix_commit_msg: "style: auto-fix by pre-commit hooks"
+  autofix_prs: true
+  autoupdate_branch: main
+  autoupdate_commit_msg: "chore: update pre-commit hooks"
+  autoupdate_schedule: monthly
