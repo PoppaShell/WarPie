@@ -31,11 +31,6 @@ MODES = {
         "desc": "Optimized AP-only scanning, faster channel hopping",
         "env": "wardrive",
     },
-    "": {
-        "name": " Mode",
-        "desc": "Target only  target devices",
-        "env": "",
-    },
 }
 
 # Common networks for quick-add buttons
@@ -94,7 +89,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         .mode-btn:active {{ transform: translateY(0); }}
         .mode-btn.normal {{ background: #4834d4; color: white; }}
         .mode-btn.wardrive {{ background: #6c5ce7; color: white; }}
-        .mode-btn. {{ background: #e84393; color: white; }}
         .mode-btn.stop {{ background: #ff4757; color: white; }}
         .mode-btn.active {{ box-shadow: 0 0 0 3px #00ff88; }}
         .mode-desc {{ font-size: 12px; color: rgba(255,255,255,0.7); margin-top: 5px; font-weight: normal; }}
@@ -541,7 +535,6 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <form method="POST" id="modeForm">
             <button type="submit" name="mode" value="normal" class="mode-btn normal {active_normal}">Normal Mode<div class="mode-desc">Full capture, home networks excluded from logs</div></button>
             <button type="submit" name="mode" value="wardrive" class="mode-btn wardrive {active_wardrive}">Wardrive Mode<div class="mode-desc">AP-only, fast scan, home excluded from logs</div></button>
-            <button type="submit" name="mode" value="" class="mode-btn  {active_}"> Mode<div class="mode-desc">Only LOG custom targets (UI shows all)</div></button>
             <button type="submit" name="mode" value="stop" class="mode-btn stop">Stop Kismet<div class="mode-desc">Stop all capture</div></button>
         </form>
         <div class="links">
@@ -655,18 +648,18 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 <div class="target-section">
                     <h3>Add OUI to Targeting Mode</h3>
                     <p style="color:#888;font-size:12px;margin-bottom:15px">
-                        Add OUI prefixes to targeting modes like . Use this when you discover new device variants in the field.
+                        Add OUI prefixes to targeting modes. Use this when you discover new device variants in the field.
                     </p>
                     <div class="target-add-row">
                         <input type="text" class="target-input" id="ouiInput" placeholder="00:AA:BB:*" onkeypress="if(event.key==='Enter')addTargetOUI()">
                         <select class="target-select" id="targetModeSelect">
-                            <option value=""></option>
+                            <option value="custom">Custom Target</option>
                         </select>
                         <button class="scan-btn" onclick="addTargetOUI()">Add</button>
                     </div>
                     <div class="filter-type-info">
                         <strong>Format:</strong> XX:XX:XX:* (OUI prefix with wildcard)<br>
-                        Example: <code style="color:#58a6ff">00:1E:C0:*</code> for custom targets
+                        Example: <code style="color:#58a6ff">00:1E:C0:*</code> for vendor-specific devices
                     </div>
                 </div>
 

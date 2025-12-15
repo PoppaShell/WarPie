@@ -699,52 +699,6 @@ KISMET_SITE_EOF
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Kismet site config"
     fi
 
-    #  targeting configuration
-    # NOTE: These filters only affect LOG FILES - Kismet UI will still display all devices
-    cat > "${KISMET_CONF_DIR}/kismet_.conf" << '_EOF'
-#  Custom Targeting Mode
-# Use with: kismet --override 
-#
-# IMPORTANT: These filters only affect what gets LOGGED to files.
-# The Kismet web UI will still display ALL detected devices.
-# Check the WiGLE CSV output to verify only  devices are logged.
-
-load_alert=:Targeting  target devices - LOG FILTER ONLY
-
-kis_log_device_filter_default=block
-
-#  BSSID Prefixes (excluding B8:27:EB - Raspberry Pi Foundation)
-kis_log_device_filter=IEEE802.11,00:F4:8D:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,08:3A:88:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,14:5A:FC:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,3C:91:80:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,62:DD:4C:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,70:C9:4E:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,74:4C:A1:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,80:30:49:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,86:A2:F4:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,92:B7:DD:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,94:08:53:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,9C:2F:9D:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,A2:A2:F4:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,A6:A2:F4:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,C0:C9:E3:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,D0:39:57:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,D8:F3:BC:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,E0:0A:F6:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,E4:AA:EA:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,E4:C3:2A:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,E6:F4:C6:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,E8:D0:FC:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,F4:6A:DD:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,F6:7F:D7:00:00:00/FF:FF:FF:00:00:00,pass
-kis_log_device_filter=IEEE802.11,F8:A2:D6:00:00:00/FF:FF:FF:00:00:00,pass
-
-# Optimize for AP detection
-dot11_ap_only_survey=true
-log_types+=wiglecsv
-_EOF
-
     # Wardrive mode configuration (optimized for mobile scanning)
     cat > "${KISMET_CONF_DIR}/kismet_wardrive.conf" << 'WARDRIVE_EOF'
 # Wardrive Mode - Optimized for Mobile AP Scanning
@@ -1547,7 +1501,6 @@ print_summary() {
     echo "  - Known BSSIDs      : ${WARPIE_DIR}/known_bssids.conf"
     echo "  - Kismet site       : ${KISMET_CONF_DIR}/kismet_site.conf"
     echo "  - Wardrive mode     : ${KISMET_CONF_DIR}/kismet_wardrive.conf"
-    echo "  -       : ${KISMET_CONF_DIR}/kismet_.conf"
     echo ""
     echo "Commands:"
     echo "  - Recovery          : sudo warpie-recovery.sh"
@@ -1604,7 +1557,6 @@ run_tests() {
     test_check "known_bssids.conf has entries" "grep -q '^[0-9a-fA-F]' ${WARPIE_DIR}/known_bssids.conf"
     test_check "kismet_site.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_site.conf ]]"
     test_check "kismet_wardrive.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wardrive.conf ]]"
-    test_check "kismet_.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_.conf ]]"
     test_check "hostapd config exists" "[[ -f /etc/hostapd/hostapd-wlan0.conf ]]"
     
     echo ""
@@ -1718,7 +1670,6 @@ uninstall() {
     log_info "Removing configurations..."
     rm -f "${KISMET_CONF_DIR}/kismet_site.conf"
     rm -f "${KISMET_CONF_DIR}/kismet_wardrive.conf"
-    rm -f "${KISMET_CONF_DIR}/kismet_.conf"
     rm -f /etc/hostapd/hostapd-wlan0.conf
     
     echo ""

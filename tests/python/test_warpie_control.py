@@ -33,7 +33,6 @@ class TestModeConfiguration:
         assert "MODES = {" in content, "MODES dictionary should be defined"
         assert '"normal"' in content, "Normal mode should be defined"
         assert '"wardrive"' in content, "Wardrive mode should be defined"
-        assert '""' in content, " mode should be defined"
 
 
 # TODO: Add more tests in Phase 4:

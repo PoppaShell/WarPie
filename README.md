@@ -12,7 +12,6 @@ A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, GP
 - **Multiple Capture Modes**:
   - **Normal**: Full capture with home network exclusion
   - **Wardrive**: Optimized AP-only scanning for mobile use
-  - ****: Target target device infrastructure
 
 ## Hardware Requirements
 
@@ -79,12 +78,6 @@ Optimized for mobile scanning:
 - Management frames only
 - Lower CPU/memory usage
 
-###  Mode
-Targets  target device infrastructure:
-- Only logs devices matching known  MAC prefixes
-- 25 vendor OUI filters included
-- Optimized for vendor infrastructure mapping
-
 ## Configuration Files
 
 | File | Location | Purpose |
@@ -92,7 +85,6 @@ Targets  target device infrastructure:
 | Known BSSIDs | `/etc/warpie/known_bssids.conf` | Home network list for AP switching |
 | Kismet Site | `/usr/local/etc/kismet_site.conf` | GPS config, exclusion filters |
 | Wardrive Mode | `/usr/local/etc/kismet_wardrive.conf` | Optimized scanning settings |
-|  | `/usr/local/etc/kismet_.conf` | Vendor targeting filters |
 
 ## Services
 

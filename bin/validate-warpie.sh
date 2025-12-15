@@ -71,9 +71,8 @@ test_result "Control panel accessible" "
 "
 
 test_result "Kismet config files exist" "
-    [[ -f /usr/local/etc/kismet_site.conf ]] && 
-    [[ -f /usr/local/etc/kismet_wardrive.conf ]] && 
-    [[ -f /usr/local/etc/kismet_.conf ]]
+    [[ -f /usr/local/etc/kismet_site.conf ]] &&
+    [[ -f /usr/local/etc/kismet_wardrive.conf ]]
 " true
 
 # =============================================================================
@@ -102,13 +101,12 @@ echo ""
 echo "--- Log Organization ---"
 
 test_result "Log directory structure exists" "
-    [[ -d ~/kismet/logs/normal ]] && 
-    [[ -d ~/kismet/logs/wardrive ]] && 
-    [[ -d ~/kismet/logs/ ]]
+    [[ -d ~/kismet/logs/normal ]] &&
+    [[ -d ~/kismet/logs/wardrive ]]
 "
 
 # Check if any logs exist for today
-if [[ -d ~/kismet/logs/normal/$TODAY ]] || [[ -d ~/kismet/logs/wardrive/$TODAY ]] || [[ -d ~/kismet/logs//$TODAY ]]; then
+if [[ -d ~/kismet/logs/normal/$TODAY ]] || [[ -d ~/kismet/logs/wardrive/$TODAY ]]; then
     log_info "Found logs for today ($TODAY) - running validation..."
     
     # =============================================================================

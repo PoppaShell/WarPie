@@ -162,9 +162,9 @@ describe('WarPie Control Panel JavaScript', () => {
         test('renders targeting inclusion item correctly', () => {
             const target = {
                 oui: '00:1E:C0:*',
-                mode: '',
+                mode: 'custom',
                 builtin: false,
-                description: 'custom target',
+                description: 'Custom vendor device',
             };
 
             const html = `
@@ -179,8 +179,8 @@ describe('WarPie Control Panel JavaScript', () => {
             `.trim();
 
             expect(html).toContain('00:1E:C0:*');
-            expect(html).toContain('');
-            expect(html).toContain('custom target');
+            expect(html).toContain('custom');
+            expect(html).toContain('Custom vendor device');
             expect(html).not.toContain('built-in');
         });
     });

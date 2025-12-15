@@ -32,7 +32,6 @@ readonly EXCLUSIONS_FILE="${WARPIE_DIR}/ssid_exclusions.conf"
 readonly KNOWN_BSSIDS_FILE="${WARPIE_DIR}/known_bssids.conf"
 readonly KISMET_SITE_CONF="/usr/local/etc/kismet_site.conf"
 readonly KISMET_WARDRIVE_CONF="/usr/local/etc/kismet_wardrive.conf"
-readonly KISMET__CONF="/usr/local/etc/kismet_.conf"
 readonly KISMET_LOGS_DIR="${HOME}/kismet/logs"
 readonly SCAN_INTERFACE="wlan0"
 

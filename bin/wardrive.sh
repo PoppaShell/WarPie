@@ -46,11 +46,6 @@ case "$MODE" in
             -c wlan1:name=AWUS036AXML_5GHz \
             -c wlan2:name=RT3070_24GHz
         ;;
-    )
-        exec kismet --no-ncurses --override  \
-            -c wlan1:name=AWUS036AXML_5GHz \
-            -c wlan2:name=RT3070_24GHz
-        ;;
     *)
         exec kismet --no-ncurses \
             -c wlan1:name=AWUS036AXML_5GHz \
