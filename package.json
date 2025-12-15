@@ -1,0 +1,23 @@
+{
+  "name": "warpie",
+  "version": "2.4.1",
+  "description": "Raspberry Pi wardriving platform with Kismet",
+  "private": true,
+  "scripts": {
+    "lint:js": "eslint --ext .js .",
+    "lint:extract": "node scripts/extract-js.js && eslint .extracted-js/",
+    "test": "jest",
+    "test:js": "jest",
+    "lint": "npm run lint:extract"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "jest-environment-jsdom": "^29.7.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/warpie/warpie.git"
+  },
+  "license": "GPL-3.0"
+}
