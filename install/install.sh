@@ -184,13 +184,19 @@ detect_wifi_interfaces() {
     local -a driver_names=()
     local -a bands=()
 
-    for iface_path in /sys/class/net/wlan*; do
+    # Look for both standard wlan* and our persistent warpie_* names
+    for iface_path in /sys/class/net/wlan* /sys/class/net/warpie_*; do
         [[ -e "${iface_path}" ]] || continue
         local iface
         iface=$(basename "${iface_path}")
 
         # Skip monitor interfaces
         [[ "${iface}" == *mon* ]] && continue
+
+        # Check if this is actually a wireless interface
+        if [[ ! -d "${iface_path}/wireless" ]] && ! iw dev "${iface}" info &>/dev/null; then
+            continue
+        fi
 
         local mac driver driver_name band
         mac=$(cat "${iface_path}/address" 2>/dev/null | tr '[:lower:]' '[:upper:]')
@@ -207,6 +213,8 @@ detect_wifi_interfaces() {
 
     if [[ ${#interfaces[@]} -eq 0 ]]; then
         log_error "No WiFi interfaces detected!"
+        log_info "Please ensure WiFi adapters are connected and drivers are loaded."
+        log_info "Check with: ip link show"
         exit 1
     fi
 
@@ -244,8 +252,8 @@ configure_adapters_interactive() {
     echo ""
     echo "WarPie needs to know which adapter to use for each function:"
     echo ""
-    echo "  1. ${CYAN}Access Point / Home WiFi${NC} - For WarPie AP and connecting to your home network"
-    echo "  2. ${CYAN}Capture Interfaces${NC}      - For Kismet wardriving (can be 1 or more)"
+    echo -e "  1. ${CYAN}Access Point / Home WiFi${NC} - For WarPie AP and connecting to your home network"
+    echo -e "  2. ${CYAN}Capture Interfaces${NC}      - For Kismet wardriving (can be 1 or more)"
     echo ""
 
     # Detect interfaces first
