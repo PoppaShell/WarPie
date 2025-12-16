@@ -19,6 +19,7 @@ PORT = 1337
 FILTER_MANAGER_SCRIPT = "/usr/local/bin/warpie-filter-manager.sh"
 # Fallback to old script if new one doesn't exist yet
 EXCLUDE_SCRIPT = "/usr/local/bin/warpie-exclude-ssid.sh"
+FILTER_PROCESSOR_SCRIPT = "/usr/local/bin/warpie-filter-processor.py"
 
 MODES = {
     "normal": {
@@ -1299,6 +1300,58 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
     def api_remove_exclusion(self, exclusion_id):
         return self.call_filter_script("--remove", str(exclusion_id))
 
+    # ==================== PRE-UPLOAD SANITIZATION API ====================
+    def call_processor_script(self, *args):
+        """Call the filter processor script with arguments and return JSON result"""
+        if not Path(FILTER_PROCESSOR_SCRIPT).exists():
+            return {"success": False, "error": "Filter processor not installed"}
+        try:
+            cmd = ["python3", FILTER_PROCESSOR_SCRIPT, "--json"] + list(args)
+            result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=60)
+            if result.stdout.strip():
+                return json.loads(result.stdout)
+            return {"success": False, "error": "No output from processor"}
+        except json.JSONDecodeError:
+            return {"success": False, "error": "Invalid JSON response"}
+        except subprocess.TimeoutExpired:
+            return {"success": False, "error": "Script timeout"}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def api_preview_sanitization(self, path: str):
+        """Preview what would be removed during sanitization"""
+        if not path:
+            return {"success": False, "error": "Path required"}
+        return self.call_processor_script("--preview", path)
+
+    def api_process_sanitization(self, path: str):
+        """Execute sanitization (actually remove entries)"""
+        if not path:
+            return {"success": False, "error": "Path required"}
+        return self.call_processor_script("--process", path)
+
+    def api_list_backups(self):
+        """List available backups from filter processor"""
+        return self.call_processor_script("--list-backups")
+
+    def api_processor_status(self):
+        """Check if filter processor daemon is running"""
+        try:
+            result = subprocess.run(
+                ["pgrep", "-f", "warpie-filter-processor.py"],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+            if result.returncode == 0:
+                # Extract PID from output
+                pids = result.stdout.strip().split("\n")
+                pid = int(pids[0]) if pids and pids[0] else None
+                return {"running": True, "pid": pid}
+            return {"running": False, "pid": None}
+        except Exception as e:
+            return {"running": False, "pid": None, "error": str(e)}
+
     # ==================== REQUEST HANDLERS ====================
     def do_GET(self):
         parsed = urlparse(self.path)
@@ -1340,6 +1393,25 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
                 self.send_json_response({"success": False, "error": "SSID required"})
                 return
             self.send_json_response(self.api_scan_ssid(ssid))
+            return
+
+        # API: Pre-upload sanitization preview
+        if path == "/api/filters/pre-upload/preview":
+            path_arg = params.get("path", [""])[0]
+            if not path_arg:
+                self.send_json_response({"success": False, "error": "Path required"})
+                return
+            self.send_json_response(self.api_preview_sanitization(path_arg))
+            return
+
+        # API: Processor status
+        if path == "/api/filters/processor/status":
+            self.send_json_response(self.api_processor_status())
+            return
+
+        # API: List backups
+        if path == "/api/filters/backups":
+            self.send_json_response(self.api_list_backups())
             return
 
         # Main page
@@ -1385,6 +1457,20 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
 
         return self.api_add_exclusion(ssid, method, bssids)
 
+    def _handle_post_pre_upload_execute(self, body):
+        """Handle POST /api/filters/pre-upload/execute - execute sanitization."""
+        data = json.loads(body)
+        path = data.get("path", "")
+        create_backup = data.get("create_backup", True)
+
+        if not path:
+            return {"success": False, "error": "Path required"}
+
+        result = self.api_process_sanitization(path)
+        if create_backup and result.get("success"):
+            result["backup_recommended"] = True
+        return result
+
     def do_POST(self):
         content_length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(content_length).decode()
@@ -1409,6 +1495,14 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
         if self.path == "/api/exclusions":
             try:
                 self.send_json_response(self._handle_post_exclusion_legacy(body))
+            except Exception as e:
+                self.send_json_response({"success": False, "error": str(e)})
+            return
+
+        # API: Execute pre-upload sanitization
+        if self.path == "/api/filters/pre-upload/execute":
+            try:
+                self.send_json_response(self._handle_post_pre_upload_execute(body))
             except Exception as e:
                 self.send_json_response({"success": False, "error": str(e)})
             return
