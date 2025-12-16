@@ -1,0 +1,24 @@
+[Unit]
+Description=WarPie Network Filter Processor Daemon
+Documentation=man:warpie-filter-processor(1)
+After=network.target kismet.service
+Wants=kismet.service
+
+[Service]
+Type=simple
+User=pi
+ExecStart=/usr/local/bin/warpie-filter-processor.py --daemon
+Restart=on-failure
+RestartSec=10s
+StandardOutput=append:/var/log/warpie/filter-processor.log
+StandardError=append:/var/log/warpie/filter-processor.log
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/warpie /etc/warpie ~/.kismet
+
+[Install]
+WantedBy=multi-user.target

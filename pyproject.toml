@@ -85,6 +85,12 @@ ignore = [
 # ERA001: False positives on API comment headers
 # RUF005: List concatenation style - acceptable
 "bin/warpie-control.py" = ["E501", "W291", "W293", "S104", "E722", "PTH103", "PTH119", "PTH123", "PTH207", "PLR0911", "ERA001", "RUF005"]
+# warpie-filter-processor.py processes files and uses os.path extensively
+# PTH*: pathlib conversion deferred - os.path is more familiar for sysadmin scripts
+# PLR0912/PLR0915: Complex functions acceptable for CLI main() and workflow functions
+# PLW2901: Loop variable reassignment is intentional for line processing
+# ARG001: signal handler frame argument required by signature
+"bin/warpie-filter-processor.py" = ["PTH103", "PTH110", "PTH111", "PTH112", "PTH113", "PTH118", "PTH119", "PTH120", "PTH123", "PTH202", "PTH204", "PTH208", "PLR0912", "PLR0915", "PLW2901", "ARG001", "SIM105"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["warpie"]
