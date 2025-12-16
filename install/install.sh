@@ -41,15 +41,32 @@ UDEV_RULES="/etc/udev/rules.d/70-warpie-wifi.rules"
 # WiFi adapter configuration (will be set by configure_adapters_interactive)
 WIFI_AP=""
 WIFI_AP_MAC=""
+
+# Per-adapter configuration arrays (indexed by adapter number)
+declare -a ADAPTER_IFACES=()
+declare -a ADAPTER_MACS=()
+declare -a ADAPTER_NAMES=()
+declare -a ADAPTER_ENABLED_BANDS=()     # e.g., "2.4GHz,5GHz"
+declare -a ADAPTER_CHANNELS_24=()       # e.g., "1,6,11" or "all" or ""
+declare -a ADAPTER_CHANNELS_5=()        # e.g., "all" or "36,40,44,48"
+declare -a ADAPTER_CHANNELS_6=()        # e.g., "5,21,37,53" or "all"
+
+# Temporary arrays used during selection (before band config)
 WIFI_CAPTURE_INTERFACES=()
-WIFI_CAPTURE_NAMES=()
 WIFI_CAPTURE_MACS=()
+CAPTURE_INTERFACE_INDICES=()            # Original detection indices for band lookup
 
 # AP Configuration
 AP_SSID="WarPie"
 AP_PASS="wardriving"
 AP_CHANNEL="6"
 AP_IP="192.168.4.1"
+
+# Standard WiFi Channel Lists
+readonly CHANNELS_24_ALL="1,2,3,4,5,6,7,8,9,10,11"
+readonly CHANNELS_24_NONOVERLAP="1,6,11"
+readonly CHANNELS_5_ALL="36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165"
+readonly CHANNELS_6_PSC="5,21,37,53,69,85,101,117,133,149,165,181,197,213,229"
 
 # Script mode
 MODE="install"
@@ -292,8 +309,8 @@ configure_adapters_interactive() {
     read -r -p "> " capture_choices
 
     WIFI_CAPTURE_INTERFACES=()
-    WIFI_CAPTURE_NAMES=()
     WIFI_CAPTURE_MACS=()
+    CAPTURE_INTERFACE_INDICES=()
 
     for choice in ${capture_choices}; do
         if [[ "${choice}" =~ ^[0-9]+$ ]] && \
@@ -302,20 +319,7 @@ configure_adapters_interactive() {
             local idx=${available_indices[$((choice - 1))]}
             WIFI_CAPTURE_INTERFACES+=("${DETECTED_INTERFACES[$idx]}")
             WIFI_CAPTURE_MACS+=("${DETECTED_MACS[$idx]}")
-
-            # Generate a friendly name based on bands
-            local cap_name
-            local cap_bands="${DETECTED_BANDS[$idx]}"
-            if [[ "${cap_bands}" == *"6GHz"* ]]; then
-                cap_name="WiFi_6GHz"
-            elif [[ "${cap_bands}" == *"5GHz"* ]]; then
-                cap_name="WiFi_5GHz"
-            elif [[ "${cap_bands}" == *"2.4GHz"* ]]; then
-                cap_name="WiFi_24GHz"
-            else
-                cap_name="WiFi_Cap$((${#WIFI_CAPTURE_INTERFACES[@]}))"
-            fi
-            WIFI_CAPTURE_NAMES+=("${cap_name}")
+            CAPTURE_INTERFACE_INDICES+=("$idx")
         else
             log_warn "Ignoring invalid choice: ${choice}"
         fi
@@ -327,20 +331,26 @@ configure_adapters_interactive() {
     fi
 
     echo ""
-    log_success "Capture Interfaces:"
-    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
-        echo "  - ${WIFI_CAPTURE_INTERFACES[$i]} -> ${WIFI_CAPTURE_NAMES[$i]}"
-    done
-    echo ""
+    log_success "Selected ${#WIFI_CAPTURE_INTERFACES[@]} capture interface(s)"
+
+    # --- Step 3: Configure bands and channels for each adapter ---
+    configure_adapter_bands
 
     # --- Confirm Configuration ---
-    echo -e "${BOLD}Configuration Summary:${NC}"
+    echo -e "${BOLD}==============================================================================${NC}"
+    echo -e "${BOLD}  Configuration Summary${NC}"
+    echo -e "${BOLD}==============================================================================${NC}"
     echo ""
     echo "  AP/Home WiFi:  ${WIFI_AP} (MAC: ${WIFI_AP_MAC})"
-    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
-        echo "  Capture ${i}:     ${WIFI_CAPTURE_INTERFACES[$i]} -> ${WIFI_CAPTURE_NAMES[$i]} (MAC: ${WIFI_CAPTURE_MACS[$i]})"
-    done
     echo ""
+    for i in "${!ADAPTER_IFACES[@]}"; do
+        echo "  Capture ${i}: ${ADAPTER_IFACES[$i]} -> ${ADAPTER_NAMES[$i]}"
+        echo "             Bands: ${ADAPTER_ENABLED_BANDS[$i]}"
+        [[ -n "${ADAPTER_CHANNELS_24[$i]}" ]] && echo "             2.4GHz: ${ADAPTER_CHANNELS_24[$i]}"
+        [[ -n "${ADAPTER_CHANNELS_5[$i]}" ]] && echo "             5GHz: ${ADAPTER_CHANNELS_5[$i]}"
+        [[ -n "${ADAPTER_CHANNELS_6[$i]}" ]] && echo "             6GHz: ${ADAPTER_CHANNELS_6[$i]}"
+        echo ""
+    done
 
     read -r -p "Is this correct? [Y/n]: " confirm
     if [[ "${confirm,,}" == "n" ]]; then
@@ -369,14 +379,25 @@ save_adapter_config() {
 WIFI_AP="${WIFI_AP}"
 WIFI_AP_MAC="${WIFI_AP_MAC}"
 
-# Capture Interfaces (space-separated)
-WIFI_CAPTURE_INTERFACES="${WIFI_CAPTURE_INTERFACES[*]}"
-WIFI_CAPTURE_NAMES="${WIFI_CAPTURE_NAMES[*]}"
-WIFI_CAPTURE_MACS="${WIFI_CAPTURE_MACS[*]}"
+# Capture Adapter Count
+WIFI_CAPTURE_COUNT=${#ADAPTER_IFACES[@]}
 
-# Number of capture interfaces
-WIFI_CAPTURE_COUNT=${#WIFI_CAPTURE_INTERFACES[@]}
 EOF
+
+    # Write per-adapter configuration
+    for i in "${!ADAPTER_IFACES[@]}"; do
+        cat >> "${ADAPTERS_CONF}" << EOF
+# Adapter ${i}: ${ADAPTER_NAMES[$i]}
+ADAPTER_${i}_IFACE="${ADAPTER_IFACES[$i]}"
+ADAPTER_${i}_MAC="${ADAPTER_MACS[$i]}"
+ADAPTER_${i}_NAME="${ADAPTER_NAMES[$i]}"
+ADAPTER_${i}_BANDS="${ADAPTER_ENABLED_BANDS[$i]}"
+ADAPTER_${i}_CHANNELS_24="${ADAPTER_CHANNELS_24[$i]}"
+ADAPTER_${i}_CHANNELS_5="${ADAPTER_CHANNELS_5[$i]}"
+ADAPTER_${i}_CHANNELS_6="${ADAPTER_CHANNELS_6[$i]}"
+
+EOF
+    done
 
     chmod 644 "${ADAPTERS_CONF}"
     log_success "Configuration saved to ${ADAPTERS_CONF}"
@@ -388,10 +409,32 @@ load_adapter_config() {
         # shellcheck source=/dev/null
         source "${ADAPTERS_CONF}"
 
-        # Convert space-separated strings back to arrays
-        read -ra WIFI_CAPTURE_INTERFACES <<< "${WIFI_CAPTURE_INTERFACES}"
-        read -ra WIFI_CAPTURE_NAMES <<< "${WIFI_CAPTURE_NAMES}"
-        read -ra WIFI_CAPTURE_MACS <<< "${WIFI_CAPTURE_MACS}"
+        # Reconstruct arrays from indexed variables
+        ADAPTER_IFACES=()
+        ADAPTER_MACS=()
+        ADAPTER_NAMES=()
+        ADAPTER_ENABLED_BANDS=()
+        ADAPTER_CHANNELS_24=()
+        ADAPTER_CHANNELS_5=()
+        ADAPTER_CHANNELS_6=()
+
+        for ((i=0; i<WIFI_CAPTURE_COUNT; i++)); do
+            local iface_var="ADAPTER_${i}_IFACE"
+            local mac_var="ADAPTER_${i}_MAC"
+            local name_var="ADAPTER_${i}_NAME"
+            local bands_var="ADAPTER_${i}_BANDS"
+            local ch24_var="ADAPTER_${i}_CHANNELS_24"
+            local ch5_var="ADAPTER_${i}_CHANNELS_5"
+            local ch6_var="ADAPTER_${i}_CHANNELS_6"
+
+            ADAPTER_IFACES+=("${!iface_var}")
+            ADAPTER_MACS+=("${!mac_var}")
+            ADAPTER_NAMES+=("${!name_var}")
+            ADAPTER_ENABLED_BANDS+=("${!bands_var}")
+            ADAPTER_CHANNELS_24+=("${!ch24_var}")
+            ADAPTER_CHANNELS_5+=("${!ch5_var}")
+            ADAPTER_CHANNELS_6+=("${!ch6_var}")
+        done
 
         return 0
     fi
@@ -413,11 +456,11 @@ SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${WIFI_AP_MAC,,}", NAME="warpie
 EOF
 
     # Add rules for each capture interface
-    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
-        local mac="${WIFI_CAPTURE_MACS[$i],,}"  # lowercase
+    for i in "${!ADAPTER_IFACES[@]}"; do
+        local mac="${ADAPTER_MACS[$i],,}"  # lowercase
         local name="warpie_cap${i}"
         cat >> "${UDEV_RULES}" << EOF
-# Capture Interface ${i}: ${WIFI_CAPTURE_NAMES[$i]}
+# Capture Interface ${i}: ${ADAPTER_NAMES[$i]}
 SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${mac}", NAME="${name}"
 
 EOF
@@ -432,9 +475,256 @@ EOF
     log_warn "Note: Interface names will change after reboot."
     log_info "After reboot, interfaces will be named:"
     echo "  - warpie_ap (AP/Home WiFi)"
-    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
-        echo "  - warpie_cap${i} (${WIFI_CAPTURE_NAMES[$i]})"
+    for i in "${!ADAPTER_IFACES[@]}"; do
+        echo "  - warpie_cap${i} (${ADAPTER_NAMES[$i]})"
     done
+}
+
+# =============================================================================
+# GRANULAR BAND AND CHANNEL CONFIGURATION
+# =============================================================================
+
+# Generate a descriptive adapter name based on selected bands
+# Args: $1=adapter_index, $2=bands_string (comma-separated)
+generate_adapter_name() {
+    local idx="$1"
+    local bands="$2"
+
+    # Count bands
+    local count=0
+    [[ "$bands" == *"2.4GHz"* ]] && ((count++))
+    [[ "$bands" == *"5GHz"* ]] && ((count++))
+    [[ "$bands" == *"6GHz"* ]] && ((count++))
+
+    if [[ $count -eq 1 ]]; then
+        # Single band - use specific name
+        [[ "$bands" == *"6GHz"* ]] && echo "WiFi_6GHz_${idx}" && return
+        [[ "$bands" == *"5GHz"* ]] && echo "WiFi_5GHz_${idx}" && return
+        [[ "$bands" == *"2.4GHz"* ]] && echo "WiFi_24GHz_${idx}" && return
+    elif [[ $count -eq 2 ]]; then
+        # Dual band
+        [[ "$bands" == *"2.4GHz"* && "$bands" == *"5GHz"* ]] && echo "WiFi_DualBand_${idx}" && return
+        [[ "$bands" == *"5GHz"* && "$bands" == *"6GHz"* ]] && echo "WiFi_HighBand_${idx}" && return
+        [[ "$bands" == *"2.4GHz"* && "$bands" == *"6GHz"* ]] && echo "WiFi_Mixed_${idx}" && return
+    else
+        # Tri-band
+        echo "WiFi_TriBand_${idx}" && return
+    fi
+
+    # Fallback
+    echo "WiFi_Cap_${idx}"
+}
+
+# Prompt user for channel selection within a band
+# Args: $1=band
+# Returns: channel string (via echo)
+select_channels_for_band() {
+    local band="$1"
+
+    echo ""
+    echo -e "${CYAN}${band} Channel Selection:${NC}"
+
+    case "$band" in
+        "2.4GHz")
+            echo "  [A] All channels (1-11)"
+            echo "  [N] Non-overlapping (1,6,11) - recommended"
+            echo "  [C] Custom list"
+            ;;
+        "5GHz")
+            echo "  [A] All channels (36-165)"
+            echo "  [C] Custom list"
+            ;;
+        "6GHz")
+            echo "  [A] All channels (59 channels)"
+            echo "  [P] PSC channels only (15 channels) - recommended for scanning"
+            echo "  [C] Custom list"
+            ;;
+    esac
+
+    local choice
+    read -r -p "> " choice
+
+    case "${choice^^}" in
+        A)
+            case "$band" in
+                "2.4GHz") echo "$CHANNELS_24_ALL" ;;
+                "5GHz")   echo "$CHANNELS_5_ALL" ;;
+                "6GHz")   echo "$CHANNELS_6_PSC" ;;  # Default to PSC for 6GHz even on "all"
+            esac
+            ;;
+        N)
+            if [[ "$band" == "2.4GHz" ]]; then
+                echo "$CHANNELS_24_NONOVERLAP"
+            else
+                # N not valid for other bands, use defaults
+                case "$band" in
+                    "5GHz") echo "$CHANNELS_5_ALL" ;;
+                    "6GHz") echo "$CHANNELS_6_PSC" ;;
+                esac
+            fi
+            ;;
+        P)
+            if [[ "$band" == "6GHz" ]]; then
+                echo "$CHANNELS_6_PSC"
+            else
+                # P not valid for other bands, use defaults
+                case "$band" in
+                    "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
+                    "5GHz")   echo "$CHANNELS_5_ALL" ;;
+                esac
+            fi
+            ;;
+        C)
+            echo -e "${CYAN}Enter comma-separated channel list:${NC}"
+            local custom
+            read -r -p "> " custom
+            # Basic validation - just check it's not empty
+            if [[ -n "$custom" ]]; then
+                echo "$custom"
+            else
+                log_warn "Empty input, using defaults"
+                case "$band" in
+                    "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
+                    "5GHz")   echo "$CHANNELS_5_ALL" ;;
+                    "6GHz")   echo "$CHANNELS_6_PSC" ;;
+                esac
+            fi
+            ;;
+        *)
+            # Default selections for invalid input
+            case "$band" in
+                "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
+                "5GHz")   echo "$CHANNELS_5_ALL" ;;
+                "6GHz")   echo "$CHANNELS_6_PSC" ;;
+            esac
+            ;;
+    esac
+}
+
+# Configure bands and channels for a single adapter
+# Args: $1=adapter_index, $2=interface, $3=capable_bands, $4=driver_name
+configure_single_adapter() {
+    local adapter_idx="$1"
+    local iface="$2"
+    local capable="$3"
+    local driver="$4"
+    local mac="$5"
+
+    echo ""
+    echo -e "${BOLD}━━━ Adapter $((adapter_idx + 1)): ${iface} - ${driver} ━━━${NC}"
+    echo -e "    Capable bands: ${CYAN}${capable}${NC}"
+    echo ""
+
+    # Parse capable bands into array
+    local -a cap_array=()
+    [[ "$capable" == *"2.4GHz"* ]] && cap_array+=("2.4GHz")
+    [[ "$capable" == *"5GHz"* ]] && cap_array+=("5GHz")
+    [[ "$capable" == *"6GHz"* ]] && cap_array+=("6GHz")
+
+    # Show band selection menu
+    echo "Select bands to capture (space-separated numbers, or 'all'):"
+    for j in "${!cap_array[@]}"; do
+        echo "  [$((j + 1))] ${cap_array[$j]}"
+    done
+
+    local band_input
+    read -r -p "> " band_input
+
+    # Process band selection
+    local -a selected_bands=()
+    if [[ "${band_input,,}" == "all" ]]; then
+        selected_bands=("${cap_array[@]}")
+    else
+        for choice in ${band_input}; do
+            if [[ "$choice" =~ ^[0-9]+$ ]] && \
+               [[ "$choice" -ge 1 ]] && \
+               [[ "$choice" -le ${#cap_array[@]} ]]; then
+                selected_bands+=("${cap_array[$((choice - 1))]}")
+            else
+                log_warn "Ignoring invalid band choice: $choice"
+            fi
+        done
+    fi
+
+    # If nothing selected, default to all
+    if [[ ${#selected_bands[@]} -eq 0 ]]; then
+        log_warn "No bands selected, defaulting to all available"
+        selected_bands=("${cap_array[@]}")
+    fi
+
+    # Configure channels for each selected band
+    local channels_24="" channels_5="" channels_6=""
+
+    for band in "${selected_bands[@]}"; do
+        case "$band" in
+            "2.4GHz")
+                channels_24=$(select_channels_for_band "2.4GHz")
+                ;;
+            "5GHz")
+                channels_5=$(select_channels_for_band "5GHz")
+                ;;
+            "6GHz")
+                channels_6=$(select_channels_for_band "6GHz")
+                ;;
+        esac
+    done
+
+    # Generate adapter name based on bands
+    local bands_str
+    bands_str=$(IFS=','; echo "${selected_bands[*]}")
+    local adapter_name
+    adapter_name=$(generate_adapter_name "$adapter_idx" "$bands_str")
+
+    # Store configuration in global arrays
+    ADAPTER_IFACES+=("$iface")
+    ADAPTER_MACS+=("$mac")
+    ADAPTER_NAMES+=("$adapter_name")
+    ADAPTER_ENABLED_BANDS+=("$bands_str")
+    ADAPTER_CHANNELS_24+=("$channels_24")
+    ADAPTER_CHANNELS_5+=("$channels_5")
+    ADAPTER_CHANNELS_6+=("$channels_6")
+
+    # Display confirmation
+    echo ""
+    log_success "${iface} -> ${adapter_name}"
+    echo "    Bands: ${bands_str}"
+    [[ -n "$channels_24" ]] && echo "    2.4GHz channels: ${channels_24}"
+    [[ -n "$channels_5" ]] && echo "    5GHz channels: ${channels_5}"
+    [[ -n "$channels_6" ]] && echo "    6GHz channels: ${channels_6}"
+}
+
+# Configure bands and channels for each selected capture adapter
+# Reads from: WIFI_CAPTURE_INTERFACES, CAPTURE_INTERFACE_INDICES, DETECTED_BANDS
+# Populates: ADAPTER_* arrays
+configure_adapter_bands() {
+    echo ""
+    echo -e "${BOLD}==============================================================================${NC}"
+    echo -e "${BOLD}  Step 3: Configure Capture Adapter Bands${NC}"
+    echo -e "${BOLD}==============================================================================${NC}"
+    echo ""
+    echo "For each adapter, select which bands to capture and channel configuration."
+    echo "Quick options: 'all' selects all bands, [A] selects all channels."
+
+    # Clear adapter arrays before populating
+    ADAPTER_IFACES=()
+    ADAPTER_MACS=()
+    ADAPTER_NAMES=()
+    ADAPTER_ENABLED_BANDS=()
+    ADAPTER_CHANNELS_24=()
+    ADAPTER_CHANNELS_5=()
+    ADAPTER_CHANNELS_6=()
+
+    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
+        local iface="${WIFI_CAPTURE_INTERFACES[$i]}"
+        local mac="${WIFI_CAPTURE_MACS[$i]}"
+        local idx="${CAPTURE_INTERFACE_INDICES[$i]}"
+        local capable="${DETECTED_BANDS[$idx]}"
+        local driver="${DETECTED_DRIVER_NAMES[$idx]}"
+
+        configure_single_adapter "$i" "$iface" "$capable" "$driver" "$mac"
+    done
+
+    echo ""
 }
 
 # =============================================================================
