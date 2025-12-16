@@ -898,11 +898,6 @@ case "\$MODE" in
             -c ${WIFI_5GHZ}:name=${WIFI_5GHZ_NAME} \\
             -c ${WIFI_24GHZ}:name=${WIFI_24GHZ_NAME}
         ;;
-    )
-        exec kismet --no-ncurses --override  \\
-            -c ${WIFI_5GHZ}:name=${WIFI_5GHZ_NAME} \\
-            -c ${WIFI_24GHZ}:name=${WIFI_24GHZ_NAME}
-        ;;
     *)
         exec kismet --no-ncurses \\
             -c ${WIFI_5GHZ}:name=${WIFI_5GHZ_NAME} \\
