@@ -2,10 +2,11 @@
   "name": "warpie",
   "version": "2.4.1",
   "description": "Raspberry Pi wardriving platform with Kismet",
+  "type": "module",
   "private": true,
   "scripts": {
     "lint:js": "eslint --ext .js .",
-    "lint:extract": "node scripts/extract-js.js && eslint .extracted-js/",
+    "lint:extract": "node scripts/extract-js.cjs && eslint .extracted-js/",
     "test": "jest",
     "test:js": "jest",
     "lint": "npm run lint:extract"
