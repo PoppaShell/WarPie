@@ -35,12 +35,15 @@ WARPIE_USER="${SUDO_USER:-pi}"
 WARPIE_DIR="/etc/warpie"
 LOG_DIR="/var/log/warpie"
 KISMET_CONF_DIR="/usr/local/etc"
+ADAPTERS_CONF="${WARPIE_DIR}/adapters.conf"
+UDEV_RULES="/etc/udev/rules.d/70-warpie-wifi.rules"
 
-# WiFi adapter names (adjust if different)
-WIFI_5GHZ="wlan1"
-WIFI_24GHZ="wlan2"
-WIFI_5GHZ_NAME="AWUS036AXML_5GHz"
-WIFI_24GHZ_NAME="RT3070_24GHz"
+# WiFi adapter configuration (will be set by configure_adapters_interactive)
+WIFI_AP=""
+WIFI_AP_MAC=""
+WIFI_CAPTURE_INTERFACES=()
+WIFI_CAPTURE_NAMES=()
+WIFI_CAPTURE_MACS=()
 
 # AP Configuration
 AP_SSID="WarPie"
@@ -88,6 +91,349 @@ parse_args() {
                 exit 1
                 ;;
         esac
+    done
+}
+
+# =============================================================================
+# WIFI ADAPTER DETECTION AND CONFIGURATION
+# =============================================================================
+
+# Get driver name for an interface
+get_interface_driver() {
+    local iface="$1"
+    local driver_path="/sys/class/net/${iface}/device/driver"
+    if [[ -L "${driver_path}" ]]; then
+        basename "$(readlink -f "${driver_path}")"
+    else
+        echo "unknown"
+    fi
+}
+
+# Get friendly name based on driver
+get_driver_friendly_name() {
+    local driver="$1"
+    case "${driver}" in
+        brcmfmac)    echo "Raspberry Pi Internal (Broadcom)" ;;
+        mt7921u)     echo "MediaTek MT7921AU (e.g., AWUS036AXML)" ;;
+        mt76x2u)     echo "MediaTek MT76x2 (e.g., AWUS036ACM)" ;;
+        rt2800usb)   echo "Ralink RT3070/RT5370 (2.4GHz)" ;;
+        ath9k_htc)   echo "Atheros AR9271 (2.4GHz)" ;;
+        rtl8xxxu|rtl88xxau|88XXau) echo "Realtek USB WiFi" ;;
+        *)           echo "Unknown (${driver})" ;;
+    esac
+}
+
+# Detect supported bands for an interface
+get_interface_bands() {
+    local iface="$1"
+    local phy
+    local bands=""
+
+    # Get the phy for this interface
+    phy=$(iw dev "${iface}" info 2>/dev/null | grep wiphy | awk '{print $2}')
+    if [[ -z "${phy}" ]]; then
+        echo "unknown"
+        return
+    fi
+
+    # Check supported bands from phy info
+    local phy_info
+    phy_info=$(iw phy "phy${phy}" info 2>/dev/null)
+
+    if echo "${phy_info}" | grep -q "Band 1:"; then
+        bands="${bands}2.4GHz "
+    fi
+    if echo "${phy_info}" | grep -q "Band 2:"; then
+        bands="${bands}5GHz "
+    fi
+    if echo "${phy_info}" | grep -q "Band 4:"; then
+        bands="${bands}6GHz "
+    fi
+
+    if [[ -z "${bands}" ]]; then
+        echo "unknown"
+    else
+        echo "${bands}" | xargs  # trim whitespace
+    fi
+}
+
+# Detect all WiFi interfaces and their properties
+detect_wifi_interfaces() {
+    log_info "Detecting WiFi interfaces..."
+
+    local -a interfaces=()
+    local -a macs=()
+    local -a drivers=()
+    local -a driver_names=()
+    local -a bands=()
+
+    for iface_path in /sys/class/net/wlan*; do
+        [[ -e "${iface_path}" ]] || continue
+        local iface
+        iface=$(basename "${iface_path}")
+
+        # Skip monitor interfaces
+        [[ "${iface}" == *mon* ]] && continue
+
+        local mac driver driver_name band
+        mac=$(cat "${iface_path}/address" 2>/dev/null | tr '[:lower:]' '[:upper:]')
+        driver=$(get_interface_driver "${iface}")
+        driver_name=$(get_driver_friendly_name "${driver}")
+        band=$(get_interface_bands "${iface}")
+
+        interfaces+=("${iface}")
+        macs+=("${mac}")
+        drivers+=("${driver}")
+        driver_names+=("${driver_name}")
+        bands+=("${band}")
+    done
+
+    if [[ ${#interfaces[@]} -eq 0 ]]; then
+        log_error "No WiFi interfaces detected!"
+        exit 1
+    fi
+
+    # Export for use by other functions
+    DETECTED_INTERFACES=("${interfaces[@]}")
+    DETECTED_MACS=("${macs[@]}")
+    DETECTED_DRIVERS=("${drivers[@]}")
+    DETECTED_DRIVER_NAMES=("${driver_names[@]}")
+    DETECTED_BANDS=("${bands[@]}")
+
+    # Display detected interfaces
+    echo ""
+    echo -e "${BOLD}Detected WiFi Interfaces:${NC}"
+    echo ""
+    printf "  %-3s  %-8s  %-19s  %-15s  %s\n" "#" "Interface" "MAC Address" "Bands" "Device"
+    printf "  %-3s  %-8s  %-19s  %-15s  %s\n" "---" "--------" "-------------------" "---------------" "------"
+
+    for i in "${!interfaces[@]}"; do
+        printf "  %-3s  %-8s  %-19s  %-15s  %s\n" \
+            "$((i+1))" \
+            "${interfaces[$i]}" \
+            "${macs[$i]}" \
+            "${bands[$i]}" \
+            "${driver_names[$i]}"
+    done
+    echo ""
+}
+
+# Interactive adapter assignment
+configure_adapters_interactive() {
+    echo ""
+    echo -e "${BOLD}==============================================================================${NC}"
+    echo -e "${BOLD}  WiFi Adapter Configuration${NC}"
+    echo -e "${BOLD}==============================================================================${NC}"
+    echo ""
+    echo "WarPie needs to know which adapter to use for each function:"
+    echo ""
+    echo "  1. ${CYAN}Access Point / Home WiFi${NC} - For WarPie AP and connecting to your home network"
+    echo "  2. ${CYAN}Capture Interfaces${NC}      - For Kismet wardriving (can be 1 or more)"
+    echo ""
+
+    # Detect interfaces first
+    detect_wifi_interfaces
+
+    # --- Select AP Interface ---
+    echo -e "${BOLD}Step 1: Select Access Point Interface${NC}"
+    echo ""
+    echo "Which interface should be used for the WarPie AP and home WiFi connection?"
+    echo "(Usually the Raspberry Pi's internal WiFi - look for 'Broadcom' or 'brcmfmac')"
+    echo ""
+
+    local ap_choice
+    while true; do
+        read -r -p "Enter interface number [1-${#DETECTED_INTERFACES[@]}]: " ap_choice
+        if [[ "${ap_choice}" =~ ^[0-9]+$ ]] && \
+           [[ "${ap_choice}" -ge 1 ]] && \
+           [[ "${ap_choice}" -le ${#DETECTED_INTERFACES[@]} ]]; then
+            break
+        fi
+        log_warn "Invalid choice. Please enter a number between 1 and ${#DETECTED_INTERFACES[@]}"
+    done
+
+    local ap_idx=$((ap_choice - 1))
+    WIFI_AP="${DETECTED_INTERFACES[$ap_idx]}"
+    WIFI_AP_MAC="${DETECTED_MACS[$ap_idx]}"
+
+    log_success "AP Interface: ${WIFI_AP} (${DETECTED_DRIVER_NAMES[$ap_idx]})"
+    echo ""
+
+    # --- Select Capture Interfaces ---
+    echo -e "${BOLD}Step 2: Select Capture Interface(s)${NC}"
+    echo ""
+    echo "Which interface(s) should be used for Kismet capture?"
+    echo "(Select all external USB adapters you want to use for wardriving)"
+    echo ""
+
+    # Show remaining interfaces
+    echo "Available interfaces (excluding AP):"
+    local -a available_indices=()
+    for i in "${!DETECTED_INTERFACES[@]}"; do
+        if [[ $i -ne $ap_idx ]]; then
+            available_indices+=("$i")
+            printf "  %s) %s - %s [%s]\n" \
+                "${#available_indices[@]}" \
+                "${DETECTED_INTERFACES[$i]}" \
+                "${DETECTED_DRIVER_NAMES[$i]}" \
+                "${DETECTED_BANDS[$i]}"
+        fi
+    done
+    echo ""
+
+    if [[ ${#available_indices[@]} -eq 0 ]]; then
+        log_error "No interfaces available for capture after selecting AP!"
+        log_error "You need at least one USB WiFi adapter for wardriving."
+        exit 1
+    fi
+
+    echo "Enter interface numbers separated by spaces (e.g., '1 2' for both):"
+    local capture_choices
+    read -r -p "> " capture_choices
+
+    WIFI_CAPTURE_INTERFACES=()
+    WIFI_CAPTURE_NAMES=()
+    WIFI_CAPTURE_MACS=()
+
+    for choice in ${capture_choices}; do
+        if [[ "${choice}" =~ ^[0-9]+$ ]] && \
+           [[ "${choice}" -ge 1 ]] && \
+           [[ "${choice}" -le ${#available_indices[@]} ]]; then
+            local idx=${available_indices[$((choice - 1))]}
+            WIFI_CAPTURE_INTERFACES+=("${DETECTED_INTERFACES[$idx]}")
+            WIFI_CAPTURE_MACS+=("${DETECTED_MACS[$idx]}")
+
+            # Generate a friendly name based on bands
+            local cap_name
+            local cap_bands="${DETECTED_BANDS[$idx]}"
+            if [[ "${cap_bands}" == *"6GHz"* ]]; then
+                cap_name="WiFi_6GHz"
+            elif [[ "${cap_bands}" == *"5GHz"* ]]; then
+                cap_name="WiFi_5GHz"
+            elif [[ "${cap_bands}" == *"2.4GHz"* ]]; then
+                cap_name="WiFi_24GHz"
+            else
+                cap_name="WiFi_Cap$((${#WIFI_CAPTURE_INTERFACES[@]}))"
+            fi
+            WIFI_CAPTURE_NAMES+=("${cap_name}")
+        else
+            log_warn "Ignoring invalid choice: ${choice}"
+        fi
+    done
+
+    if [[ ${#WIFI_CAPTURE_INTERFACES[@]} -eq 0 ]]; then
+        log_error "No capture interfaces selected!"
+        exit 1
+    fi
+
+    echo ""
+    log_success "Capture Interfaces:"
+    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
+        echo "  - ${WIFI_CAPTURE_INTERFACES[$i]} -> ${WIFI_CAPTURE_NAMES[$i]}"
+    done
+    echo ""
+
+    # --- Confirm Configuration ---
+    echo -e "${BOLD}Configuration Summary:${NC}"
+    echo ""
+    echo "  AP/Home WiFi:  ${WIFI_AP} (MAC: ${WIFI_AP_MAC})"
+    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
+        echo "  Capture ${i}:     ${WIFI_CAPTURE_INTERFACES[$i]} -> ${WIFI_CAPTURE_NAMES[$i]} (MAC: ${WIFI_CAPTURE_MACS[$i]})"
+    done
+    echo ""
+
+    read -r -p "Is this correct? [Y/n]: " confirm
+    if [[ "${confirm,,}" == "n" ]]; then
+        log_info "Restarting adapter configuration..."
+        configure_adapters_interactive
+        return
+    fi
+
+    # Save configuration
+    save_adapter_config
+    generate_udev_rules
+}
+
+# Save adapter configuration to file
+save_adapter_config() {
+    log_info "Saving adapter configuration..."
+
+    mkdir -p "${WARPIE_DIR}"
+
+    cat > "${ADAPTERS_CONF}" << EOF
+# WarPie WiFi Adapter Configuration
+# Generated: $(date)
+# Do not edit manually - run 'sudo install.sh --configure' to reconfigure
+
+# Access Point / Home WiFi Interface
+WIFI_AP="${WIFI_AP}"
+WIFI_AP_MAC="${WIFI_AP_MAC}"
+
+# Capture Interfaces (space-separated)
+WIFI_CAPTURE_INTERFACES="${WIFI_CAPTURE_INTERFACES[*]}"
+WIFI_CAPTURE_NAMES="${WIFI_CAPTURE_NAMES[*]}"
+WIFI_CAPTURE_MACS="${WIFI_CAPTURE_MACS[*]}"
+
+# Number of capture interfaces
+WIFI_CAPTURE_COUNT=${#WIFI_CAPTURE_INTERFACES[@]}
+EOF
+
+    chmod 644 "${ADAPTERS_CONF}"
+    log_success "Configuration saved to ${ADAPTERS_CONF}"
+}
+
+# Load adapter configuration from file
+load_adapter_config() {
+    if [[ -f "${ADAPTERS_CONF}" ]]; then
+        # shellcheck source=/dev/null
+        source "${ADAPTERS_CONF}"
+
+        # Convert space-separated strings back to arrays
+        read -ra WIFI_CAPTURE_INTERFACES <<< "${WIFI_CAPTURE_INTERFACES}"
+        read -ra WIFI_CAPTURE_NAMES <<< "${WIFI_CAPTURE_NAMES}"
+        read -ra WIFI_CAPTURE_MACS <<< "${WIFI_CAPTURE_MACS}"
+
+        return 0
+    fi
+    return 1
+}
+
+# Generate udev rules for persistent interface naming
+generate_udev_rules() {
+    log_info "Generating udev rules for persistent interface naming..."
+
+    cat > "${UDEV_RULES}" << EOF
+# WarPie WiFi Adapter Persistent Naming Rules
+# Generated: $(date)
+# These rules ensure WiFi adapters get consistent names based on MAC address
+
+# AP Interface (internal WiFi)
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${WIFI_AP_MAC,,}", NAME="warpie_ap"
+
+EOF
+
+    # Add rules for each capture interface
+    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
+        local mac="${WIFI_CAPTURE_MACS[$i],,}"  # lowercase
+        local name="warpie_cap${i}"
+        cat >> "${UDEV_RULES}" << EOF
+# Capture Interface ${i}: ${WIFI_CAPTURE_NAMES[$i]}
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${mac}", NAME="${name}"
+
+EOF
+    done
+
+    chmod 644 "${UDEV_RULES}"
+    log_success "udev rules written to ${UDEV_RULES}"
+
+    # Reload udev rules
+    udevadm control --reload-rules 2>/dev/null || true
+
+    log_warn "Note: Interface names will change after reboot."
+    log_info "After reboot, interfaces will be named:"
+    echo "  - warpie_ap (AP/Home WiFi)"
+    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
+        echo "  - warpie_cap${i} (${WIFI_CAPTURE_NAMES[$i]})"
     done
 }
 
@@ -297,31 +643,45 @@ configure_wifi_interactive() {
     echo "  1. Your home WiFi network (for auto-connect when in range)"
     echo "  2. Networks to exclude from Kismet logging"
     echo ""
-    
-    # Ensure wlan0 is up for scanning
-    ip link set wlan0 up 2>/dev/null || true
+
+    # Load adapter config to get AP interface for scanning
+    load_adapter_config || {
+        log_error "Adapter configuration not found. Run adapter configuration first."
+        return 1
+    }
+
+    # Determine scan interface (prefer persistent name if available)
+    local scan_iface
+    if [[ -e "/sys/class/net/warpie_ap" ]]; then
+        scan_iface="warpie_ap"
+    else
+        scan_iface="${WIFI_AP}"
+    fi
+
+    # Ensure interface is up for scanning
+    ip link set "${scan_iface}" up 2>/dev/null || true
     sleep 2
-    
+
     # Ask for home network SSID
     echo -e "${CYAN}Step 1: Home Network Configuration${NC}"
     echo ""
-    read -p "Enter your home WiFi network name (SSID): " HOME_SSID
-    
+    read -r -p "Enter your home WiFi network name (SSID): " HOME_SSID
+
     if [[ -z "$HOME_SSID" ]]; then
         log_warn "No SSID entered, skipping WiFi configuration"
         return 1
     fi
-    
+
     echo ""
-    log_info "Scanning for networks matching '$HOME_SSID'..."
-    
+    log_info "Scanning for networks matching '$HOME_SSID' using ${scan_iface}..."
+
     # Scan for networks
-    SCAN_RESULTS=$(iw dev wlan0 scan 2>/dev/null || true)
-    
+    SCAN_RESULTS=$(iw dev "${scan_iface}" scan 2>/dev/null || true)
+
     if [[ -z "$SCAN_RESULTS" ]]; then
         log_warn "Scan returned no results. Retrying..."
         sleep 3
-        SCAN_RESULTS=$(iw dev wlan0 scan 2>/dev/null || true)
+        SCAN_RESULTS=$(iw dev "${scan_iface}" scan 2>/dev/null || true)
     fi
     
     # Parse scan results to find matching SSIDs and their BSSIDs
@@ -571,11 +931,27 @@ configure_network_manager() {
 
 set -u
 
+readonly ADAPTERS_CONF="/etc/warpie/adapters.conf"
 readonly BSSID_CONFIG="/etc/warpie/known_bssids.conf"
-readonly HOSTAPD_CONFIG="/etc/hostapd/hostapd-wlan0.conf"
+readonly HOSTAPD_CONFIG="/etc/hostapd/hostapd.conf"
 readonly LOG_FILE="/var/log/warpie/network-manager.log"
-readonly INTERFACE="wlan0"
 readonly AP_IP="192.168.4.1"
+
+# Load adapter configuration to get AP interface
+if [[ -f "$ADAPTERS_CONF" ]]; then
+    # shellcheck source=/dev/null
+    source "$ADAPTERS_CONF"
+else
+    echo "ERROR: Adapter configuration not found" >&2
+    exit 1
+fi
+
+# Determine which interface to use (prefer persistent name)
+if [[ -e "/sys/class/net/warpie_ap" ]]; then
+    readonly INTERFACE="warpie_ap"
+else
+    readonly INTERFACE="${WIFI_AP}"
+fi
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }
 
@@ -631,7 +1007,7 @@ fi
 log "No trusted networks found - starting Access Point mode"
 
 # Tell NetworkManager to ignore wlan0
-log "Removing wlan0 from NetworkManager..."
+log "Removing $INTERFACE from NetworkManager..."
 nmcli device set "$INTERFACE" managed no 2>/dev/null || true
 sleep 1
 
@@ -685,10 +1061,25 @@ NETMGR_EOF
 # =============================================================================
 configure_hostapd() {
     log_info "Configuring hostapd..."
-    
-    cat > /etc/hostapd/hostapd-wlan0.conf << HOSTAPD_EOF
+
+    # Load adapter config to get AP interface
+    load_adapter_config || {
+        log_error "Adapter configuration not found. Run adapter configuration first."
+        exit 1
+    }
+
+    # Determine which interface name to use
+    # Use persistent name if udev rules exist, otherwise use original name
+    local ap_interface
+    if [[ -f "${UDEV_RULES}" ]]; then
+        ap_interface="warpie_ap"
+    else
+        ap_interface="${WIFI_AP}"
+    fi
+
+    cat > /etc/hostapd/hostapd.conf << HOSTAPD_EOF
 # WarPie Access Point Configuration
-interface=wlan0
+interface=${ap_interface}
 driver=nl80211
 ssid=${AP_SSID}
 hw_mode=g
@@ -704,7 +1095,7 @@ wpa_pairwise=TKIP
 rsn_pairwise=CCMP
 HOSTAPD_EOF
 
-    log_success "hostapd configured (SSID: ${AP_SSID}, Pass: ${AP_PASS})"
+    log_success "hostapd configured (Interface: ${ap_interface}, SSID: ${AP_SSID})"
 }
 
 # =============================================================================
@@ -850,14 +1241,30 @@ WARDRIVE_EOF
 configure_wardrive_service() {
     log_info "Configuring wardrive service..."
     
-    cat > /usr/local/bin/wardrive.sh << WARDRIVE_EOF
+    cat > /usr/local/bin/wardrive.sh << 'WARDRIVE_EOF'
 #!/bin/bash
 # WarPie Wardrive Launcher
 
+set -e
+
 LOG_FILE="/var/log/warpie/wardrive.log"
-KISMET_BASE="/home/${WARPIE_USER}/kismet"
+ADAPTERS_CONF="/etc/warpie/adapters.conf"
+KISMET_BASE="\${HOME}/kismet"
 
 log() { echo "[\$(date '+%Y-%m-%d %H:%M:%S')] [INFO] \$1" | tee -a "\$LOG_FILE"; }
+
+# Load adapter configuration
+if [[ -f "\${ADAPTERS_CONF}" ]]; then
+    # shellcheck source=/dev/null
+    source "\${ADAPTERS_CONF}"
+    # Convert space-separated strings to arrays
+    read -ra WIFI_CAPTURE_INTERFACES <<< "\${WIFI_CAPTURE_INTERFACES}"
+    read -ra WIFI_CAPTURE_NAMES <<< "\${WIFI_CAPTURE_NAMES}"
+else
+    log "ERROR: Adapter configuration not found at \${ADAPTERS_CONF}"
+    log "Please run: sudo /path/to/install.sh --configure"
+    exit 1
+fi
 
 # Determine mode from environment or default
 MODE="\${KISMET_MODE:-normal}"
@@ -873,7 +1280,7 @@ cd "\$KISMET_DIR"
 
 # Check GPS status
 log "Checking GPS status..."
-GPS_STATUS=\$(gpspipe -w -n 1 2>/dev/null | grep -o '"mode":[0-9]' | head -1)
+GPS_STATUS=\$(gpspipe -w -n 1 2>/dev/null | grep -o '"mode":[0-9]' | head -1 || true)
 if [[ "\$GPS_STATUS" == *"3"* ]]; then
     log "GPS status: 3D Fix"
 elif [[ "\$GPS_STATUS" == *"2"* ]]; then
@@ -884,7 +1291,7 @@ fi
 
 # Try to sync time from GPS
 log "Attempting GPS time synchronization..."
-GPS_TIME=\$(gpspipe -w -n 5 2>/dev/null | grep -o '"time":"[^"]*"' | head -1 | cut -d'"' -f4)
+GPS_TIME=\$(gpspipe -w -n 5 2>/dev/null | grep -o '"time":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
 if [[ -n "\$GPS_TIME" ]]; then
     log "GPS time received: \$GPS_TIME"
     date -s "\$GPS_TIME" 2>/dev/null && log "System time synchronized from GPS" || log "Could not set system time"
@@ -892,16 +1299,29 @@ fi
 
 log "Starting Kismet in \$MODE mode..."
 
+# Build capture interface arguments dynamically
+CAPTURE_ARGS=""
+for i in "\${!WIFI_CAPTURE_INTERFACES[@]}"; do
+    iface="\${WIFI_CAPTURE_INTERFACES[\$i]}"
+    name="\${WIFI_CAPTURE_NAMES[\$i]}"
+    # Use persistent name if available, otherwise use original interface name
+    if [[ -e "/sys/class/net/warpie_cap\${i}" ]]; then
+        CAPTURE_ARGS="\${CAPTURE_ARGS} -c warpie_cap\${i}:name=\${name}"
+    else
+        CAPTURE_ARGS="\${CAPTURE_ARGS} -c \${iface}:name=\${name}"
+    fi
+done
+
+log "Capture interfaces:\${CAPTURE_ARGS}"
+
 case "\$MODE" in
     wardrive)
-        exec kismet --no-ncurses --override wardrive \\
-            -c ${WIFI_5GHZ}:name=${WIFI_5GHZ_NAME} \\
-            -c ${WIFI_24GHZ}:name=${WIFI_24GHZ_NAME}
+        # shellcheck disable=SC2086
+        exec kismet --no-ncurses --override wardrive \${CAPTURE_ARGS}
         ;;
     *)
-        exec kismet --no-ncurses \\
-            -c ${WIFI_5GHZ}:name=${WIFI_5GHZ_NAME} \\
-            -c ${WIFI_24GHZ}:name=${WIFI_24GHZ_NAME}
+        # shellcheck disable=SC2086
+        exec kismet --no-ncurses \${CAPTURE_ARGS}
         ;;
 esac
 WARDRIVE_EOF
@@ -1793,16 +2213,15 @@ run_configure() {
     
     # Initialize exclusions array
     KISMET_EXCLUSIONS=()
-    
-    # Auto-exclude the WarPie AP (wlan0's MAC address)
-    if [[ -f /sys/class/net/wlan0/address ]]; then
-        local WLAN0_MAC=$(cat /sys/class/net/wlan0/address | tr '[:lower:]' '[:upper:]')
-        if [[ -n "$WLAN0_MAC" ]]; then
-            log_info "Auto-excluding WarPie AP (wlan0 MAC: ${WLAN0_MAC})"
-            KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${WLAN0_MAC}/FF:FF:FF:FF:FF:FF,block")
-        fi
+
+    # Load adapter config to get AP MAC for auto-exclusion
+    if load_adapter_config && [[ -n "${WIFI_AP_MAC}" ]]; then
+        local AP_MAC_UPPER
+        AP_MAC_UPPER=$(echo "${WIFI_AP_MAC}" | tr '[:lower:]' '[:upper:]')
+        log_info "Auto-excluding WarPie AP (MAC: ${AP_MAC_UPPER})"
+        KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${AP_MAC_UPPER}/FF:FF:FF:FF:FF:FF,block")
     fi
-    
+
     configure_wifi_interactive
     
     # Update Kismet config with new exclusions
@@ -1870,17 +2289,20 @@ main() {
             ;;
         install)
             echo "============================================================================="
-            echo "WarPie Wardriving System Installer v2.3.1"
+            echo "WarPie Wardriving System Installer v2.3.0"
             echo "============================================================================="
             echo ""
-            
+
             preflight_checks
             create_directories
             configure_kismet_permissions
-            
-            # Interactive WiFi configuration
+
+            # WiFi adapter detection and configuration (must run before other WiFi config)
+            configure_adapters_interactive
+
+            # Interactive WiFi network configuration (home networks, exclusions)
             configure_wifi_interactive || configure_known_bssids
-            
+
             configure_network_manager
             configure_hostapd
             configure_gps

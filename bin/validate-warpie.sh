@@ -62,8 +62,27 @@ test_result "GPS device present" "
     [[ -e /dev/ttyUSB0 ]] || [[ -e /dev/serial/by-id/usb-Prolific* ]]
 "
 
-test_result "WiFi adapters detected" "
-    iw dev wlan1 info && iw dev wlan2 info
+# Load adapter config to check configured interfaces
+ADAPTERS_CONF="/etc/warpie/adapters.conf"
+if [[ -f "${ADAPTERS_CONF}" ]]; then
+    # shellcheck source=/dev/null
+    source "${ADAPTERS_CONF}"
+    read -ra WIFI_CAPTURE_IFACES <<< "${WIFI_CAPTURE_INTERFACES}"
+fi
+
+test_result "Adapter configuration exists" "
+    [[ -f /etc/warpie/adapters.conf ]]
+" true
+
+test_result "WiFi capture adapters detected" "
+    for iface in \${WIFI_CAPTURE_IFACES[@]:-wlan1 wlan2}; do
+        # Check for either original name or persistent name
+        if [[ -e /sys/class/net/\${iface} ]] || [[ -e /sys/class/net/warpie_cap0 ]]; then
+            continue
+        else
+            exit 1
+        fi
+    done
 "
 
 test_result "Control panel accessible" "
@@ -201,7 +220,7 @@ test_result "Network manager script exists" "
 " true
 
 test_result "Hostapd config exists" "
-    [[ -f /etc/hostapd/hostapd-wlan0.conf ]]
+    [[ -f /etc/hostapd/hostapd.conf ]] || [[ -f /etc/hostapd/hostapd-wlan0.conf ]]
 "
 
 # =============================================================================
