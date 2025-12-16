@@ -2,7 +2,7 @@
 # =============================================================================
 # WarPie Wardriving System - Complete Install Script
 # =============================================================================
-# Version: 2.1.0
+# Version: 2.2.0
 # Date: 2025-12-11
 #
 # Components:
@@ -92,6 +92,75 @@ parse_args() {
 }
 
 # =============================================================================
+# KISMET INSTALLATION
+# =============================================================================
+install_kismet_from_repo() {
+    log_info "Installing Kismet from official repository..."
+
+    # Detect OS version
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
+        . /etc/os-release
+        DISTRO="${ID}"
+        VERSION="${VERSION_CODENAME}"
+    else
+        log_error "Cannot detect OS version"
+        exit 1
+    fi
+
+    # Add Kismet repository GPG key
+    log_info "Adding Kismet repository key..."
+    wget -O - https://www.kismetwireless.net/repos/kismet-release.gpg.key --quiet | \
+        gpg --dearmor | tee /usr/share/keyrings/kismet-archive-keyring.gpg > /dev/null || true
+
+    # Add Kismet repository based on distribution
+    case "${DISTRO}" in
+        debian|raspbian)
+            log_info "Configuring for Debian/Raspbian (${VERSION})..."
+            echo "deb [signed-by=/usr/share/keyrings/kismet-archive-keyring.gpg] https://www.kismetwireless.net/repos/apt/release/${VERSION} ${VERSION} main" | \
+                tee /etc/apt/sources.list.d/kismet.list > /dev/null
+            ;;
+        ubuntu)
+            log_info "Configuring for Ubuntu (${VERSION})..."
+            echo "deb [signed-by=/usr/share/keyrings/kismet-archive-keyring.gpg] https://www.kismetwireless.net/repos/apt/release/${VERSION} ${VERSION} main" | \
+                tee /etc/apt/sources.list.d/kismet.list > /dev/null
+            ;;
+        *)
+            log_error "Unsupported distribution: ${DISTRO}"
+            log_info "Please install Kismet manually from: https://www.kismetwireless.net/docs/readme/installing/linux/"
+            exit 1
+            ;;
+    esac
+
+    # Update package lists
+    log_info "Updating package lists..."
+    apt-get update
+
+    # Install Kismet
+    log_info "Installing Kismet packages..."
+    apt-get install -y kismet
+
+    # Run suidinstall for non-root capture capability
+    log_info "Configuring Kismet for non-root capture..."
+
+    # Add user to kismet group (will be created by package)
+    if getent group kismet > /dev/null 2>&1; then
+        usermod -aG kismet "${WARPIE_USER}"
+        log_success "Added ${WARPIE_USER} to kismet group"
+    fi
+
+    # Verify installation
+    if command -v kismet &> /dev/null; then
+        local kismet_version
+        kismet_version=$(kismet --version 2>&1 | head -1)
+        log_success "Kismet installed: $kismet_version"
+    else
+        log_error "Kismet installation failed"
+        exit 1
+    fi
+}
+
+# =============================================================================
 # PRE-FLIGHT CHECKS
 # =============================================================================
 preflight_checks() {
@@ -121,11 +190,35 @@ preflight_checks() {
     
     # Check if Kismet is installed
     if ! command -v kismet &> /dev/null; then
-        log_error "Kismet is not installed. Please install Kismet first."
-        log_info "See: https://www.kismetwireless.net/docs/readme/installing/linux/"
-        exit 1
+        log_warn "Kismet is not installed."
+        echo ""
+        echo -e "${BOLD}Kismet Installation Options:${NC}"
+        echo ""
+        echo "  1) Install from Kismet repository (recommended)"
+        echo "     - Latest stable release with automatic updates"
+        echo "     - Faster installation"
+        echo ""
+        echo "  2) Skip Kismet installation"
+        echo "     - Install Kismet manually later"
+        echo "     - See: https://www.kismetwireless.net/docs/readme/installing/linux/"
+        echo ""
+        read -p "Choose option [1-2]: " kismet_choice
+
+        case "$kismet_choice" in
+            1)
+                install_kismet_from_repo
+                ;;
+            2)
+                log_error "Kismet is required for WarPie. Please install it manually and re-run this script."
+                exit 1
+                ;;
+            *)
+                log_error "Invalid choice. Exiting."
+                exit 1
+                ;;
+        esac
     fi
-    
+
     log_success "Pre-flight checks passed"
 }
 
