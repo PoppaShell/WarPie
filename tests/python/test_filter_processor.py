@@ -13,26 +13,20 @@ Tests cover:
 Uses pytest fixtures and mocking for isolation.
 """
 
+import importlib.util
 import json
 import logging
+import os
 import sys
-import tempfile
-from datetime import datetime
 from pathlib import Path
 from unittest import mock
-
-import pytest
-
-# Add bin directory to path for imports
-import importlib.util
 
 bin_path = Path(__file__).parent.parent.parent / "bin"
 sys.path.insert(0, str(bin_path))
 
 # Import the filter processor module (handles hyphenated filename)
 spec = importlib.util.spec_from_file_location(
-    "warpie_filter_processor",
-    str(bin_path / "warpie-filter-processor.py")
+    "warpie_filter_processor", str(bin_path / "warpie-filter-processor.py")
 )
 processor = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(processor)
@@ -88,11 +82,7 @@ class TestFilterRuleDataclass:
 
     def test_filter_rule_creation_all_fields(self):
         """Test creating a FilterRule with all fields."""
-        rule = processor.FilterRule(
-            value="MyNetwork",
-            match_type="exact",
-            description="Home WiFi"
-        )
+        rule = processor.FilterRule(value="MyNetwork", match_type="exact", description="Home WiFi")
         assert rule.value == "MyNetwork"
         assert rule.match_type == "exact"
         assert rule.description == "Home WiFi"
@@ -124,10 +114,7 @@ class TestProcessingResultDataclass:
     def test_processing_result_creation(self):
         """Test creating a ProcessingResult."""
         result = processor.ProcessingResult(
-            file_path="/path/to/file.kismet",
-            original_count=10,
-            removed_count=3,
-            success=True
+            file_path="/path/to/file.kismet", original_count=10, removed_count=3, success=True
         )
         assert result.file_path == "/path/to/file.kismet"
         assert result.original_count == 10
@@ -152,10 +139,7 @@ class TestProcessingResultDataclass:
             {"ssid": "Test", "mac": "AA:BB:CC:DD:EE:FF", "rule": "exact", "rule_type": "exact"}
         ]
         result = processor.ProcessingResult(
-            file_path="/test.kismet",
-            original_count=5,
-            removed_count=1,
-            matches=matches
+            file_path="/test.kismet", original_count=5, removed_count=1, matches=matches
         )
         assert len(result.matches) == 1
         assert result.matches[0]["ssid"] == "Test"
@@ -167,10 +151,7 @@ class TestSanitizationReportDataclass:
     def test_sanitization_report_creation(self):
         """Test creating a SanitizationReport."""
         report = processor.SanitizationReport(
-            files_processed=2,
-            total_original=100,
-            total_removed=5,
-            backup_path="/backup/path"
+            files_processed=2, total_original=100, total_removed=5, backup_path="/backup/path"
         )
         assert report.files_processed == 2
         assert report.total_original == 100
@@ -492,28 +473,30 @@ class TestExtractSsidsFromDevice:
 
     def test_extract_single_ssid(self):
         """Test extracting single advertised SSID."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "MyNetwork"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [{"dot11.advertisedssid.ssid": "MyNetwork"}]
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 1
         assert "MyNetwork" in ssids
 
     def test_extract_multiple_ssids(self):
         """Test extracting multiple advertised SSIDs."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "Network1"},
-                    {"dot11.advertisedssid.ssid": "Network2"},
-                    {"dot11.advertisedssid.ssid": "Network3"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": "Network1"},
+                        {"dot11.advertisedssid.ssid": "Network2"},
+                        {"dot11.advertisedssid.ssid": "Network3"},
+                    ]
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 3
         assert "Network1" in ssids
@@ -522,15 +505,17 @@ class TestExtractSsidsFromDevice:
 
     def test_extract_probed_ssids(self):
         """Test extracting probed SSIDs."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [],
-                "dot11.device.probed_ssid_map": [
-                    {"dot11.probedssid.ssid": "ProbedNetwork1"},
-                    {"dot11.probedssid.ssid": "ProbedNetwork2"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [],
+                    "dot11.device.probed_ssid_map": [
+                        {"dot11.probedssid.ssid": "ProbedNetwork1"},
+                        {"dot11.probedssid.ssid": "ProbedNetwork2"},
+                    ],
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 2
         assert "ProbedNetwork1" in ssids
@@ -538,16 +523,16 @@ class TestExtractSsidsFromDevice:
 
     def test_extract_both_advertised_and_probed(self):
         """Test extracting both advertised and probed SSIDs."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "AdvertisedNetwork"}
-                ],
-                "dot11.device.probed_ssid_map": [
-                    {"dot11.probedssid.ssid": "ProbedNetwork"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": "AdvertisedNetwork"}
+                    ],
+                    "dot11.device.probed_ssid_map": [{"dot11.probedssid.ssid": "ProbedNetwork"}],
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 2
         assert "AdvertisedNetwork" in ssids
@@ -555,31 +540,33 @@ class TestExtractSsidsFromDevice:
 
     def test_extract_deduplicates_ssids(self):
         """Test that duplicate SSIDs are not repeated."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "DuplicateSSID"}
-                ],
-                "dot11.device.probed_ssid_map": [
-                    {"dot11.probedssid.ssid": "DuplicateSSID"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": "DuplicateSSID"}
+                    ],
+                    "dot11.device.probed_ssid_map": [{"dot11.probedssid.ssid": "DuplicateSSID"}],
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         # Probed should not add duplicate
         assert ssids.count("DuplicateSSID") == 1
 
     def test_extract_empty_ssids(self):
         """Test extracting from device with empty SSID strings."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": ""},
-                    {"dot11.advertisedssid.ssid": "ValidNetwork"},
-                    {"dot11.advertisedssid.ssid": ""}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": ""},
+                        {"dot11.advertisedssid.ssid": "ValidNetwork"},
+                        {"dot11.advertisedssid.ssid": ""},
+                    ]
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 1
         assert "ValidNetwork" in ssids
@@ -597,14 +584,16 @@ class TestExtractSsidsFromDevice:
 
     def test_extract_non_dict_entries(self):
         """Test handling non-dictionary entries in SSID map."""
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    "NotADict",
-                    {"dot11.advertisedssid.ssid": "ValidNetwork"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        "NotADict",
+                        {"dot11.advertisedssid.ssid": "ValidNetwork"},
+                    ]
+                }
             }
-        })
+        )
         ssids = processor.extract_ssids_from_device(device_json)
         assert len(ssids) == 1
         assert "ValidNetwork" in ssids
@@ -917,9 +906,7 @@ class TestFileDiscovery:
         file2.touch()
 
         # Make file1 older
-        import os
-        import time
-        file1_stat = os.stat(str(file1))
+        file1_stat = file1.stat()
         os.utime(str(file1), (file1_stat.st_atime - 100, file1_stat.st_mtime - 100))
 
         files = processor.find_kismetdb_files(str(logs_dir))
@@ -942,9 +929,7 @@ class TestFileDiscovery:
         test_file.touch()
 
         # Make file old (modified 100 seconds ago)
-        import os
-        import time
-        file_stat = os.stat(str(test_file))
+        file_stat = test_file.stat()
         os.utime(str(test_file), (file_stat.st_atime - 100, file_stat.st_mtime - 100))
 
         is_in_use = processor.is_file_in_use(str(test_file))
@@ -998,10 +983,11 @@ class TestFormatSize:
 class TestSetupLogging:
     """Test logging setup function."""
 
-    def test_setup_logging_console_only(self, caplog):
+    def test_setup_logging_console_only(self):
         """Test logging setup with console output."""
         processor.setup_logging(log_file=None, verbose=False)
-        assert caplog.records or True  # Just ensure it doesn't crash
+        # Just ensure it doesn't crash
+        assert True
 
     def test_setup_logging_with_file(self, tmp_path):
         """Test logging setup with file output."""
@@ -1082,20 +1068,22 @@ class TestProcessKismetdb:
         mock_connect.return_value.cursor.return_value = mock_cursor
 
         # Simulate 2 devices where 1 matches
-        device_json_match = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "MatchingSSID"}
-                ]
+        device_json_match = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": "MatchingSSID"}
+                    ]
+                }
             }
-        })
-        device_json_nomatch = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "OtherSSID"}
-                ]
+        )
+        device_json_nomatch = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [{"dot11.advertisedssid.ssid": "OtherSSID"}]
+                }
             }
-        })
+        )
 
         mock_cursor.fetchall.return_value = [
             (1, "AA:BB:CC:DD:EE:FF", device_json_match),
@@ -1383,13 +1371,15 @@ AndroidHotspot|exact|Android
         rules = processor.load_dynamic_exclusions(str(config_file))
 
         # Create test device JSON
-        device_json = json.dumps({
-            "dot11.device": {
-                "dot11.device.advertised_ssid_map": [
-                    {"dot11.advertisedssid.ssid": "iPhone Hotspot ABC"}
-                ]
+        device_json = json.dumps(
+            {
+                "dot11.device": {
+                    "dot11.device.advertised_ssid_map": [
+                        {"dot11.advertisedssid.ssid": "iPhone Hotspot ABC"}
+                    ]
+                }
             }
-        })
+        )
 
         # Extract SSID
         ssids = processor.extract_ssids_from_device(device_json)
@@ -1409,7 +1399,7 @@ ExactNetwork|exact|Exact match
 Pattern*|pattern|Pattern match
         """)
 
-        static, dynamic = processor.load_all_exclusions(str(config_file))
+        _static, dynamic = processor.load_all_exclusions(str(config_file))
 
         # Test exact match
         exact_rule = processor.find_matching_rule("ExactNetwork", dynamic)
