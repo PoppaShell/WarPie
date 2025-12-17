@@ -551,7 +551,8 @@ select_channels_for_band() {
     esac
 
     local choice
-    read -r -p "> " choice >&2
+    echo -n "> " >&2
+    read -r choice || choice=""
 
     case "${choice^^}" in
         A)
@@ -586,7 +587,8 @@ select_channels_for_band() {
         C)
             echo -e "${CYAN}Enter comma-separated channel list:${NC}" >&2
             local custom
-            read -r -p "> " custom >&2
+            echo -n "> " >&2
+            read -r custom || custom=""
             # Basic validation - just check it's not empty
             if [[ -n "$custom" ]]; then
                 echo "$custom"
