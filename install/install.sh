@@ -525,32 +525,33 @@ generate_adapter_name() {
 
 # Prompt user for channel selection within a band
 # Args: $1=band
-# Returns: channel string (via echo)
+# Returns: channel string (via echo to stdout)
+# Note: Menu output goes to stderr so it displays properly when called in subshell
 select_channels_for_band() {
     local band="$1"
 
-    echo ""
-    echo -e "${CYAN}${band} Channel Selection:${NC}"
+    echo "" >&2
+    echo -e "${CYAN}${band} Channel Selection:${NC}" >&2
 
     case "$band" in
         "2.4GHz")
-            echo "  [A] All channels (1-11)"
-            echo "  [N] Non-overlapping (1,6,11) - recommended"
-            echo "  [C] Custom list"
+            echo "  [A] All channels (1-11)" >&2
+            echo "  [N] Non-overlapping (1,6,11) - recommended" >&2
+            echo "  [C] Custom list" >&2
             ;;
         "5GHz")
-            echo "  [A] All channels (36-165)"
-            echo "  [C] Custom list"
+            echo "  [A] All channels (36-165)" >&2
+            echo "  [C] Custom list" >&2
             ;;
         "6GHz")
-            echo "  [A] All channels (59 channels)"
-            echo "  [P] PSC channels only (15 channels) - recommended for scanning"
-            echo "  [C] Custom list"
+            echo "  [A] All channels (59 channels)" >&2
+            echo "  [P] PSC channels only (15 channels) - recommended for scanning" >&2
+            echo "  [C] Custom list" >&2
             ;;
     esac
 
     local choice
-    read -r -p "> " choice
+    read -r -p "> " choice >&2
 
     case "${choice^^}" in
         A)
@@ -583,14 +584,14 @@ select_channels_for_band() {
             fi
             ;;
         C)
-            echo -e "${CYAN}Enter comma-separated channel list:${NC}"
+            echo -e "${CYAN}Enter comma-separated channel list:${NC}" >&2
             local custom
-            read -r -p "> " custom
+            read -r -p "> " custom >&2
             # Basic validation - just check it's not empty
             if [[ -n "$custom" ]]; then
                 echo "$custom"
             else
-                log_warn "Empty input, using defaults"
+                log_warn "Empty input, using defaults" >&2
                 case "$band" in
                     "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
                     "5GHz")   echo "$CHANNELS_5_ALL" ;;
