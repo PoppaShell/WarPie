@@ -1317,8 +1317,9 @@ Before=wardrive.service
 After=network.target
 
 [Service]
-Type=forking
-ExecStart=/usr/sbin/gpsd -n ${GPS_DEVICE}
+Type=simple
+ExecStart=/usr/sbin/gpsd -n -N ${GPS_DEVICE}
+ExecStartPost=/bin/sleep 5
 Restart=on-failure
 RestartSec=5
 
