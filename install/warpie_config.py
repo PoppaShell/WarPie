@@ -422,8 +422,119 @@ def configure_adapter(adapter: WifiAdapter, index: int, total: int) -> AdapterCo
     return config
 
 
+def configure_home_wifi() -> dict[str, str] | None:
+    """Configure optional home WiFi connectivity."""
+    console.print()
+    console.print(
+        Panel.fit(
+            "[bold white]Home WiFi Configuration (Optional)[/bold white]\n\n"
+            "Enable intelligent WiFi management:\n"
+            "[dim]→ When home WiFi is in range: Connects as client to your home network[/dim]\n"
+            "[dim]→ When home WiFi NOT in range: Starts WarPie AP for field access[/dim]\n"
+            "[dim]→ Seamless automatic switching - zero manual intervention[/dim]",
+            border_style="bright_blue",
+        )
+    )
+
+    if not inquirer.confirm(
+        message="Enable home WiFi connectivity?",
+        default=True,
+        instruction="Y/n | Press Enter for Yes",
+        qmark="",
+        amark="",
+    ).execute():
+        console.print("[yellow]⊘ Home WiFi disabled - WarPie AP will always run[/yellow]")
+        return None
+
+    # Get SSID
+    ssid = inquirer.text(
+        message="Home WiFi SSID:",
+        validate=lambda x: len(x.strip()) > 0,
+        invalid_message="SSID cannot be empty",
+        instruction="Enter your home WiFi network name",
+        qmark="",
+        amark="",
+    ).execute()
+
+    # Get password with masking
+    password = inquirer.secret(
+        message="Home WiFi Password:",
+        validate=lambda x: len(x) >= 8,
+        invalid_message="Password must be at least 8 characters",
+        instruction="Enter your WiFi password (hidden)",
+        qmark="",
+        amark="",
+    ).execute()
+
+    # Generate PSK hash for secure storage
+    console.print("[blue]   Generating secure PSK hash...[/blue]")
+    try:
+        result = subprocess.run(
+            ["wpa_passphrase", ssid, password],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        # Extract PSK hash from wpa_passphrase output
+        for line in result.stdout.splitlines():
+            if line.strip().startswith("psk=") and not line.strip().startswith("#psk="):
+                psk = line.strip().split("=", 1)[1]
+                break
+        else:
+            console.print("[red]Failed to generate PSK hash[/red]")
+            return None
+
+        console.print(f"[green]✓ Home WiFi configured: {ssid}[/green]")
+        console.print("[dim]   Password stored as secure PSK hash[/dim]")
+
+        return {"ssid": ssid, "psk": psk}
+
+    except subprocess.CalledProcessError:
+        console.print("[red]Failed to generate PSK hash (is wpa_passphrase installed?)[/red]")
+        return None
+
+
+def configure_kismet_autostart() -> bool:
+    """Configure Kismet auto-start behavior."""
+    console.print()
+    console.print(
+        Panel.fit(
+            "[bold white]Kismet Auto-Start Configuration[/bold white]\n\n"
+            "Choose your deployment mode:\n\n"
+            "[bright_green]■[/bright_green] [bold]Yes - Field Deployment[/bold]\n"
+            "   → Kismet starts automatically on boot\n"
+            "   → Ready for wardriving immediately\n"
+            "   → Ideal for dedicated field use\n\n"
+            "[dim]□[/dim] [bold]No - Manual Start[/bold]\n"
+            "   → Start Kismet manually from web app\n"
+            "   → Better for development/testing\n"
+            "   → More control over when scanning starts",
+            border_style="bright_green",
+        )
+    )
+
+    autostart = inquirer.confirm(
+        message="Auto-start Kismet on boot?",
+        default=True,
+        instruction="Y/n | Press Enter for Yes (Field Deployment)",
+        qmark="",
+        amark="",
+    ).execute()
+
+    if autostart:
+        console.print("[green]✓ Kismet will auto-start on boot (Field Deployment)[/green]")
+    else:
+        console.print("[yellow]⊘ Kismet manual start (start from web app)[/yellow]")
+
+    return autostart
+
+
 def save_config(
-    ap: WifiAdapter, configs: list[AdapterConfig], output_path: str = "/etc/warpie/adapters.conf"
+    ap: WifiAdapter,
+    configs: list[AdapterConfig],
+    home_wifi: dict[str, str] | None = None,
+    kismet_autostart: bool = True,
+    output_path: str = "/etc/warpie/adapters.conf",
 ) -> None:
     """Save configuration to file."""
     lines = [
@@ -432,9 +543,41 @@ def save_config(
         "",
         f'WIFI_AP="{ap.interface}"',
         f'WIFI_AP_MAC="{ap.mac}"',
-        f"WIFI_CAPTURE_COUNT={len(configs)}",
-        "",
     ]
+
+    # Add home WiFi configuration
+    if home_wifi:
+        lines.extend(
+            [
+                "",
+                "# Home WiFi Configuration",
+                'HOME_WIFI_ENABLED="true"',
+                f'HOME_WIFI_SSID="{home_wifi["ssid"]}"',
+                f'HOME_WIFI_PSK="{home_wifi["psk"]}"',
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "# Home WiFi Configuration",
+                'HOME_WIFI_ENABLED="false"',
+                'HOME_WIFI_SSID=""',
+                'HOME_WIFI_PSK=""',
+            ]
+        )
+
+    # Add Kismet configuration
+    lines.extend(
+        [
+            "",
+            "# Kismet Configuration",
+            f'KISMET_AUTOSTART="{str(kismet_autostart).lower()}"',
+            "",
+            f"WIFI_CAPTURE_COUNT={len(configs)}",
+            "",
+        ]
+    )
 
     for i, cfg in enumerate(configs):
         lines.extend(
@@ -506,6 +649,19 @@ def main():
         config = configure_adapter(adapter, i, total_adapters)
         configs.append(config)
 
+    # Step 4: Home WiFi configuration
+    console.print(
+        "\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]"
+    )
+    console.print("[bold cyan]  Network Configuration[/bold cyan]")
+    console.print(
+        "[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]"
+    )
+    home_wifi = configure_home_wifi()
+
+    # Step 5: Kismet auto-start
+    kismet_autostart = configure_kismet_autostart()
+
     # Confirm
     console.print()
     console.print(
@@ -523,6 +679,26 @@ def main():
 
     summary_table.add_row("AP Interface", f"{ap.interface} ({ap.driver_name})")
     summary_table.add_row("Capture Adapters", str(len(configs)))
+    summary_table.add_row("", "")  # Spacer
+
+    # Home WiFi summary
+    if home_wifi:
+        summary_table.add_row(
+            "[bold]Home WiFi[/bold]", f"[green]Enabled[/green] - {home_wifi['ssid']}"
+        )
+    else:
+        summary_table.add_row("[bold]Home WiFi[/bold]", "[yellow]Disabled[/yellow]")
+
+    # Kismet auto-start summary
+    if kismet_autostart:
+        summary_table.add_row(
+            "[bold]Kismet Auto-Start[/bold]", "[green]Enabled[/green] (Field Deployment)"
+        )
+    else:
+        summary_table.add_row(
+            "[bold]Kismet Auto-Start[/bold]", "[yellow]Manual Start[/yellow] (From Web App)"
+        )
+
     summary_table.add_row("", "")  # Spacer
 
     for i, cfg in enumerate(configs, 1):
@@ -545,7 +721,7 @@ def main():
     if inquirer.confirm(
         message="Save this configuration?", default=True, instruction="Y/n"
     ).execute():
-        save_config(ap, configs)
+        save_config(ap, configs, home_wifi, kismet_autostart)
         return 0
     else:
         console.print("[yellow]Configuration cancelled[/yellow]")
