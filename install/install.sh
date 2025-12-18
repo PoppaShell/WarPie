@@ -31,6 +31,7 @@ BOLD='\033[1m'
 NC='\033[0m' # No Color
 
 # Configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WARPIE_USER="${SUDO_USER:-pi}"
 WARPIE_DIR="/etc/warpie"
 LOG_DIR="/var/log/warpie"
@@ -245,133 +246,27 @@ detect_wifi_interfaces() {
 
 # Interactive adapter assignment
 configure_adapters_interactive() {
-    echo ""
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo -e "${BOLD}  WiFi Adapter Configuration${NC}"
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo ""
-    echo "WarPie needs to know which adapter to use for each function:"
-    echo ""
-    echo -e "  1. ${CYAN}Access Point / Home WiFi${NC} - For WarPie AP and connecting to your home network"
-    echo -e "  2. ${CYAN}Capture Interfaces${NC}      - For Kismet wardriving (can be 1 or more)"
-    echo ""
+    log_info "Installing Python configuration dependencies..."
 
-    # Detect interfaces first
-    detect_wifi_interfaces
+    # Install Python dependencies (try both methods for compatibility)
+    if ! pip3 install inquirerpy rich --quiet --break-system-packages 2>/dev/null; then
+        pip3 install inquirerpy rich --quiet 2>/dev/null || true
+    fi
 
-    # --- Select AP Interface ---
-    echo -e "${BOLD}Step 1: Select Access Point Interface${NC}"
-    echo ""
-    echo "Which interface should be used for the WarPie AP and home WiFi connection?"
-    echo "(Usually the Raspberry Pi's internal WiFi - look for 'Broadcom' or 'brcmfmac')"
-    echo ""
-
-    local ap_choice
-    while true; do
-        echo -n "Enter interface number [1-${#DETECTED_INTERFACES[@]}]: "
-        read -r ap_choice || ap_choice=""
-        if [[ "${ap_choice}" =~ ^[0-9]+$ ]] && \
-           [[ "${ap_choice}" -ge 1 ]] && \
-           [[ "${ap_choice}" -le ${#DETECTED_INTERFACES[@]} ]]; then
-            break
-        fi
-        log_warn "Invalid choice. Please enter a number between 1 and ${#DETECTED_INTERFACES[@]}"
-    done
-
-    local ap_idx=$((ap_choice - 1))
-    WIFI_AP="${DETECTED_INTERFACES[$ap_idx]}"
-    WIFI_AP_MAC="${DETECTED_MACS[$ap_idx]}"
-
-    log_success "AP Interface: ${WIFI_AP} (${DETECTED_DRIVER_NAMES[$ap_idx]})"
-    echo ""
-
-    # --- Select Capture Interfaces ---
-    echo -e "${BOLD}Step 2: Select Capture Interface(s)${NC}"
-    echo ""
-    echo "Which interface(s) should be used for Kismet capture?"
-    echo "(Select all external USB adapters you want to use for wardriving)"
-    echo ""
-
-    # Show remaining interfaces
-    echo "Available interfaces (excluding AP):"
-    local -a available_indices=()
-    for i in "${!DETECTED_INTERFACES[@]}"; do
-        if [[ $i -ne $ap_idx ]]; then
-            available_indices+=("$i")
-            printf "  %s) %s - %s [%s]\n" \
-                "${#available_indices[@]}" \
-                "${DETECTED_INTERFACES[$i]}" \
-                "${DETECTED_DRIVER_NAMES[$i]}" \
-                "${DETECTED_BANDS[$i]}"
-        fi
-    done
-    echo ""
-
-    if [[ ${#available_indices[@]} -eq 0 ]]; then
-        log_error "No interfaces available for capture after selecting AP!"
-        log_error "You need at least one USB WiFi adapter for wardriving."
+    # Run Python configuration tool
+    log_info "Launching interactive adapter configuration..."
+    if ! python3 "${SCRIPT_DIR}/warpie_config.py"; then
+        log_error "Adapter configuration failed or was cancelled"
         exit 1
     fi
 
-    echo "Enter interface numbers separated by spaces (e.g., '1 2' for both):"
-    local capture_choices
-    echo -n "> "
-    read -r capture_choices || capture_choices=""
-
-    WIFI_CAPTURE_INTERFACES=()
-    WIFI_CAPTURE_MACS=()
-    CAPTURE_INTERFACE_INDICES=()
-
-    for choice in ${capture_choices}; do
-        if [[ "${choice}" =~ ^[0-9]+$ ]] && \
-           [[ "${choice}" -ge 1 ]] && \
-           [[ "${choice}" -le ${#available_indices[@]} ]]; then
-            local idx=${available_indices[$((choice - 1))]}
-            WIFI_CAPTURE_INTERFACES+=("${DETECTED_INTERFACES[$idx]}")
-            WIFI_CAPTURE_MACS+=("${DETECTED_MACS[$idx]}")
-            CAPTURE_INTERFACE_INDICES+=("$idx")
-        else
-            log_warn "Ignoring invalid choice: ${choice}"
-        fi
-    done
-
-    if [[ ${#WIFI_CAPTURE_INTERFACES[@]} -eq 0 ]]; then
-        log_error "No capture interfaces selected!"
+    # Load the configuration that Python saved
+    if ! load_adapter_config; then
+        log_error "Failed to load adapter configuration"
         exit 1
     fi
 
-    echo ""
-    log_success "Selected ${#WIFI_CAPTURE_INTERFACES[@]} capture interface(s)"
-
-    # --- Step 3: Configure bands and channels for each adapter ---
-    configure_adapter_bands
-
-    # --- Confirm Configuration ---
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo -e "${BOLD}  Configuration Summary${NC}"
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo ""
-    echo "  AP/Home WiFi:  ${WIFI_AP} (MAC: ${WIFI_AP_MAC})"
-    echo ""
-    for i in "${!ADAPTER_IFACES[@]}"; do
-        echo "  Capture ${i}: ${ADAPTER_IFACES[$i]} -> ${ADAPTER_NAMES[$i]}"
-        echo "             Bands: ${ADAPTER_ENABLED_BANDS[$i]}"
-        [[ -n "${ADAPTER_CHANNELS_24[$i]}" ]] && echo "             2.4GHz: ${ADAPTER_CHANNELS_24[$i]}"
-        [[ -n "${ADAPTER_CHANNELS_5[$i]}" ]] && echo "             5GHz: ${ADAPTER_CHANNELS_5[$i]}"
-        [[ -n "${ADAPTER_CHANNELS_6[$i]}" ]] && echo "             6GHz: ${ADAPTER_CHANNELS_6[$i]}"
-        echo ""
-    done
-
-    echo -n "Is this correct? [Y/n]: "
-    read -r confirm || confirm="y"
-    if [[ "${confirm,,}" == "n" ]]; then
-        log_info "Restarting adapter configuration..."
-        configure_adapters_interactive
-        return
-    fi
-
-    # Save configuration
-    save_adapter_config
+    # Generate udev rules for persistent naming
     generate_udev_rules
 }
 
@@ -693,37 +588,6 @@ configure_single_adapter() {
 # Configure bands and channels for each selected capture adapter
 # Reads from: WIFI_CAPTURE_INTERFACES, CAPTURE_INTERFACE_INDICES, DETECTED_BANDS
 # Populates: ADAPTER_* arrays
-configure_adapter_bands() {
-    echo ""
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo -e "${BOLD}  Step 3: Configure Capture Adapter Bands${NC}"
-    echo -e "${BOLD}==============================================================================${NC}"
-    echo ""
-    echo "For each adapter, select which bands to capture and channel configuration."
-    echo "Quick options: 'all' selects all bands, '1' typically selects recommended channels."
-
-    # Clear adapter arrays before populating
-    ADAPTER_IFACES=()
-    ADAPTER_MACS=()
-    ADAPTER_NAMES=()
-    ADAPTER_ENABLED_BANDS=()
-    ADAPTER_CHANNELS_24=()
-    ADAPTER_CHANNELS_5=()
-    ADAPTER_CHANNELS_6=()
-
-    for i in "${!WIFI_CAPTURE_INTERFACES[@]}"; do
-        local iface="${WIFI_CAPTURE_INTERFACES[$i]}"
-        local mac="${WIFI_CAPTURE_MACS[$i]}"
-        local idx="${CAPTURE_INTERFACE_INDICES[$i]}"
-        local capable="${DETECTED_BANDS[$idx]}"
-        local driver="${DETECTED_DRIVER_NAMES[$idx]}"
-
-        configure_single_adapter "$i" "$iface" "$capable" "$driver" "$mac"
-    done
-
-    echo ""
-}
-
 # =============================================================================
 # KISMET INSTALLATION
 # =============================================================================
