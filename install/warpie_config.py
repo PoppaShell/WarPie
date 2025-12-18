@@ -607,7 +607,7 @@ def save_config(
     console.print(f"\n[green]Configuration saved to {output_path}[/green]")
 
 
-def main():
+def main():  # noqa: PLR0912, PLR0915
     """Main entry point."""
     console.print(
         "\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]"
