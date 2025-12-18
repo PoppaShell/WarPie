@@ -41,9 +41,8 @@ build_capture_args() {
         local ch5="${!ch5_var}"
         local ch6="${!ch6_var}"
 
-        # Check for persistent name
+        # Use the configured interface name directly
         local actual_iface="$iface"
-        [[ -e "/sys/class/net/warpie_cap${i}" ]] && actual_iface="warpie_cap${i}"
 
         # Build combined channel list from all configured bands
         local all_channels=""

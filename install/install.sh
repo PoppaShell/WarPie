@@ -361,26 +361,28 @@ load_adapter_config() {
 }
 
 # Generate udev rules for persistent interface naming
+# These rules PIN the current interface names to their MAC addresses
+# so they remain stable across reboots and USB re-plugging
 generate_udev_rules() {
-    log_info "Generating udev rules for persistent interface naming..."
+    log_info "Generating udev rules to pin interface names..."
 
     cat > "${UDEV_RULES}" << EOF
 # WarPie WiFi Adapter Persistent Naming Rules
 # Generated: $(date)
-# These rules ensure WiFi adapters get consistent names based on MAC address
+# These rules pin interface names to MAC addresses for stability
 
-# AP Interface (internal WiFi)
-SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${WIFI_AP_MAC,,}", NAME="warpie_ap"
+# AP Interface: ${WIFI_AP}
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${WIFI_AP_MAC,,}", NAME="${WIFI_AP}"
 
 EOF
 
     # Add rules for each capture interface
     for i in "${!ADAPTER_IFACES[@]}"; do
         local mac="${ADAPTER_MACS[$i],,}"  # lowercase
-        local name="warpie_cap${i}"
+        local iface="${ADAPTER_IFACES[$i]}"
         cat >> "${UDEV_RULES}" << EOF
 # Capture Interface ${i}: ${ADAPTER_NAMES[$i]}
-SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${mac}", NAME="${name}"
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="${mac}", NAME="${iface}"
 
 EOF
     done
@@ -391,11 +393,10 @@ EOF
     # Reload udev rules
     udevadm control --reload-rules 2>/dev/null || true
 
-    log_warn "Note: Interface names will change after reboot."
-    log_info "After reboot, interfaces will be named:"
-    echo "  - warpie_ap (AP/Home WiFi)"
+    log_info "Interface names pinned to MAC addresses:"
+    echo "  - ${WIFI_AP} (AP/Home WiFi)"
     for i in "${!ADAPTER_IFACES[@]}"; do
-        echo "  - warpie_cap${i} (${ADAPTER_NAMES[$i]})"
+        echo "  - ${ADAPTER_IFACES[$i]} (${ADAPTER_NAMES[$i]})"
     done
 }
 
@@ -845,13 +846,9 @@ configure_wifi_interactive() {
         fi
     fi
 
-    # Determine scan interface (prefer persistent name if available)
-    local scan_iface
-    if [[ -e "/sys/class/net/warpie_ap" ]]; then
-        scan_iface="warpie_ap"
-    else
-        scan_iface="${WIFI_AP}"
-    fi
+    # Use the configured AP interface directly (no renaming anymore)
+    local scan_iface="${WIFI_AP:-wlan0}"
+    log_info "Using interface ${scan_iface} for scanning"
 
     # Ensure interface is up for scanning
     ip link set "${scan_iface}" up 2>/dev/null || true
@@ -1171,12 +1168,8 @@ else
     exit 1
 fi
 
-# Determine which interface to use (prefer persistent name)
-if [[ -e "/sys/class/net/warpie_ap" ]]; then
-    readonly INTERFACE="warpie_ap"
-else
-    readonly INTERFACE="${WIFI_AP}"
-fi
+# Use the configured AP interface directly
+readonly INTERFACE="${WIFI_AP}"
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$LOG_FILE"; }
 
@@ -1293,14 +1286,8 @@ configure_hostapd() {
         exit 1
     }
 
-    # Determine which interface name to use
-    # Use persistent name if udev rules exist, otherwise use original name
-    local ap_interface
-    if [[ -f "${UDEV_RULES}" ]]; then
-        ap_interface="warpie_ap"
-    else
-        ap_interface="${WIFI_AP}"
-    fi
+    # Use the configured AP interface directly
+    local ap_interface="${WIFI_AP}"
 
     cat > /etc/hostapd/hostapd.conf << HOSTAPD_EOF
 # WarPie Access Point Configuration
@@ -2411,7 +2398,7 @@ uninstall() {
     # -------------------------------------------------------------------------
     # Remove udev rules and trigger interface rename revert
     # -------------------------------------------------------------------------
-    log_info "Removing udev rules (interfaces will revert to default names on reboot)..."
+    log_info "Removing udev rules..."
     rm -f /etc/udev/rules.d/70-warpie-wifi.rules
     udevadm control --reload-rules 2>/dev/null || true
     udevadm trigger 2>/dev/null || true
@@ -2420,10 +2407,9 @@ uninstall() {
     # Restore NetworkManager control of WiFi interfaces
     # -------------------------------------------------------------------------
     log_info "Restoring NetworkManager control of WiFi interfaces..."
-    # Try both old and new interface names
-    for iface in wlan0 wlan1 wlan2 warpie_ap warpie_cap0 warpie_cap1 warpie_cap2; do
-        if [[ -e "/sys/class/net/${iface}" ]]; then
-            nmcli device set "${iface}" managed yes 2>/dev/null || true
+    for iface in /sys/class/net/wlan*; do
+        if [[ -e "${iface}" ]]; then
+            nmcli device set "$(basename "${iface}")" managed yes 2>/dev/null || true
         fi
     done
 
@@ -2479,11 +2465,8 @@ uninstall() {
     log_success "WarPie uninstalled successfully"
     echo ""
     echo "Notes:"
-    echo "  - WiFi interfaces will revert to default names (wlan0, wlan1, etc.) after reboot"
     echo "  - Kismet and other packages (hostapd, dnsmasq, gpsd) were NOT uninstalled"
     echo "  - To remove packages: sudo apt remove kismet hostapd dnsmasq gpsd"
-    echo ""
-    echo "A reboot is recommended to fully revert interface names."
 }
 
 # =============================================================================

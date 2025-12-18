@@ -76,8 +76,7 @@ test_result "Adapter configuration exists" "
 
 test_result "WiFi capture adapters detected" "
     for iface in \${WIFI_CAPTURE_IFACES[@]:-wlan1 wlan2}; do
-        # Check for either original name or persistent name
-        if [[ -e /sys/class/net/\${iface} ]] || [[ -e /sys/class/net/warpie_cap0 ]]; then
+        if [[ -e /sys/class/net/\${iface} ]]; then
             continue
         else
             exit 1
