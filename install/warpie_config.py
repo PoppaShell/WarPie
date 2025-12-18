@@ -4,6 +4,7 @@ WarPie WiFi Adapter Configuration
 Interactive configuration using InquirerPy for beautiful prompts.
 """
 
+import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -24,6 +25,11 @@ except ImportError:
     from rich.table import Table
 
 console = Console()
+
+# Custom InquirerPy indicators for square bracket style
+INDICATOR_CHECKED = "■"  # Filled block
+INDICATOR_UNCHECKED = " "  # Empty
+INDICATOR_POINTER = "→"  # Arrow pointer
 
 # Channel constants
 CHANNELS_24_ALL = "1,2,3,4,5,6,7,8,9,10,11"
@@ -138,17 +144,21 @@ def detect_bands(interface: str) -> list[str]:
 
         output = result.stdout
 
-        # Check for frequency ranges instead of specific values
+        # Use regex to find all frequencies in MHz
+        freq_matches = re.findall(r'(\d{4,5})\s*MHz', output)
+        frequencies = [int(f) for f in freq_matches]
+
+        # Check which bands are present based on frequency ranges
         # 2.4GHz: 2401-2495 MHz (channels 1-14)
-        if any(f"{freq} MHz" in output for freq in range(2401, 2496)):
+        if any(2401 <= freq <= 2495 for freq in frequencies):
             bands.append("2.4GHz")
 
         # 5GHz: 5150-5895 MHz (all 5GHz channels)
-        if any(f"{freq} MHz" in output for freq in range(5150, 5896, 5)):
+        if any(5150 <= freq <= 5895 for freq in frequencies):
             bands.append("5GHz")
 
         # 6GHz: 5925-7125 MHz (WiFi 6E)
-        if any(f"{freq} MHz" in output for freq in range(5925, 7126, 5)):
+        if any(5925 <= freq <= 7125 for freq in frequencies):
             bands.append("6GHz")
 
     except Exception:
@@ -183,18 +193,27 @@ def select_ap_interface(adapters: list[WifiAdapter]) -> WifiAdapter:
             "Which interface should be used for the WarPie AP and home WiFi connection?\n"
             "[dim]→ Usually the Raspberry Pi's internal WiFi (look for 'Broadcom')[/dim]\n"
             "[dim]→ This adapter will NOT be used for wardriving[/dim]",
-            border_style="cyan",
+            border_style="bright_cyan",
+            title="[bold bright_cyan]SINGLE SELECT[/bold bright_cyan]",
+            title_align="left",
         )
     )
 
     choices = [
-        {"name": f"{a.interface} - {a.driver_name} [{a.bands_str}]", "value": a} for a in adapters
+        {
+            "name": f"[{INDICATOR_UNCHECKED}] {a.interface} - {a.driver_name} [{a.bands_str}]",
+            "value": a,
+        }
+        for a in adapters
     ]
 
     return inquirer.select(
         message="Select AP interface:",
         choices=choices,
-        instruction="↑↓ Navigate | Enter Select | ? Help",
+        instruction="↑↓ Navigate | Enter Select",
+        pointer=INDICATOR_POINTER,
+        qmark="",
+        amark="",
     ).execute()
 
 
@@ -210,7 +229,9 @@ def select_capture_interfaces(
             "[dim]→ Select all external USB adapters[/dim]\n"
             "[dim]→ You can select multiple interfaces[/dim]\n"
             "[dim]→ Use Space to toggle, Enter to confirm[/dim]",
-            border_style="cyan",
+            border_style="bright_magenta",
+            title="[bold bright_magenta]MULTI SELECT[/bold bright_magenta]",
+            title_align="left",
         )
     )
 
@@ -230,12 +251,19 @@ def select_capture_interfaces(
         validate=lambda result: len(result) > 0,
         invalid_message="Select at least one interface",
         instruction="Space Toggle | Enter Confirm",
+        pointer=INDICATOR_POINTER,
+        enabled_symbol=INDICATOR_CHECKED,
+        disabled_symbol=INDICATOR_UNCHECKED,
+        qmark="",
+        amark="",
     ).execute()
 
     # Show clean summary of selections
     console.print(f"\n[green]✓ Selected {len(selected)} capture interface(s):[/green]")
     for adapter in selected:
-        console.print(f"  [cyan]•[/cyan] {adapter.interface} - {adapter.driver_name}")
+        console.print(
+            f"  [bright_green]■[/bright_green] {adapter.interface} - {adapter.driver_name}"
+        )
 
     return selected
 
@@ -244,7 +272,9 @@ def select_bands(adapter: WifiAdapter) -> list[str]:
     """Select which bands to capture for an adapter."""
     if len(adapter.bands) == 1:
         # Only one band available, auto-select but inform user
-        console.print(f"[dim]   → Only {adapter.bands[0]} available, auto-selected[/dim]")
+        console.print(
+            f"[bright_yellow]   ⚡ Only {adapter.bands[0]} available, auto-selected[/bright_yellow]"
+        )
         return adapter.bands.copy()
 
     # Add helpful descriptions for each band
@@ -263,6 +293,11 @@ def select_bands(adapter: WifiAdapter) -> list[str]:
         validate=lambda result: len(result) > 0,
         invalid_message="Select at least one band",
         instruction="Space Toggle | Enter Confirm | All selected by default",
+        pointer=INDICATOR_POINTER,
+        enabled_symbol=INDICATOR_CHECKED,
+        disabled_symbol=INDICATOR_UNCHECKED,
+        qmark="",
+        amark="",
     ).execute()
 
 
@@ -270,31 +305,42 @@ def select_channels(band: str) -> str:
     """Select channel configuration for a band."""
     if band == "2.4GHz":
         choices = [
-            {"name": "All channels (1-11)", "value": CHANNELS_24_ALL},
-            {"name": "Non-overlapping (1,6,11) - recommended", "value": CHANNELS_24_NONOVERLAP},
-            {"name": "Custom list", "value": "custom"},
+            {"name": f"[{INDICATOR_UNCHECKED}] All channels (1-11)", "value": CHANNELS_24_ALL},
+            {
+                "name": f"[{INDICATOR_UNCHECKED}] Non-overlapping (1,6,11) - recommended",
+                "value": CHANNELS_24_NONOVERLAP,
+            },
+            {"name": f"[{INDICATOR_UNCHECKED}] Custom list", "value": "custom"},
         ]
     elif band == "5GHz":
         choices = [
-            {"name": "All channels (36-165)", "value": CHANNELS_5_ALL},
-            {"name": "Custom list", "value": "custom"},
+            {"name": f"[{INDICATOR_UNCHECKED}] All channels (36-165)", "value": CHANNELS_5_ALL},
+            {"name": f"[{INDICATOR_UNCHECKED}] Custom list", "value": "custom"},
         ]
     else:  # 6GHz
         choices = [
-            {"name": "PSC channels (15 channels) - recommended", "value": CHANNELS_6_PSC},
-            {"name": "All channels", "value": CHANNELS_6_PSC},  # Use PSC for "all" too
-            {"name": "Custom list", "value": "custom"},
+            {
+                "name": f"[{INDICATOR_UNCHECKED}] PSC channels (15 channels) - recommended",
+                "value": CHANNELS_6_PSC,
+            },
+            {"name": f"[{INDICATOR_UNCHECKED}] All channels", "value": CHANNELS_6_PSC},
+            {"name": f"[{INDICATOR_UNCHECKED}] Custom list", "value": "custom"},
         ]
 
     result = inquirer.select(
         message=f"{band} channel selection:",
         choices=choices,
+        pointer=INDICATOR_POINTER,
+        qmark="",
+        amark="",
     ).execute()
 
     if result == "custom":
         return inquirer.text(
             message="Enter comma-separated channel list:",
             validate=lambda x: len(x) > 0,
+            qmark="",
+            amark="",
         ).execute()
 
     return result
