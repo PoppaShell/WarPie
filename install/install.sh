@@ -1392,93 +1392,11 @@ WARDRIVE_EOF
 # =============================================================================
 configure_wardrive_service() {
     log_info "Configuring wardrive service..."
-    
-    cat > /usr/local/bin/wardrive.sh << 'WARDRIVE_EOF'
-#!/bin/bash
-# WarPie Wardrive Launcher
 
-set -e
-
-LOG_FILE="/var/log/warpie/wardrive.log"
-ADAPTERS_CONF="/etc/warpie/adapters.conf"
-KISMET_BASE="\${HOME}/kismet"
-
-log() { echo "[\$(date '+%Y-%m-%d %H:%M:%S')] [INFO] \$1" | tee -a "\$LOG_FILE"; }
-
-# Load adapter configuration
-if [[ -f "\${ADAPTERS_CONF}" ]]; then
-    # shellcheck source=/dev/null
-    source "\${ADAPTERS_CONF}"
-    # Convert space-separated strings to arrays
-    read -ra WIFI_CAPTURE_INTERFACES <<< "\${WIFI_CAPTURE_INTERFACES}"
-    read -ra WIFI_CAPTURE_NAMES <<< "\${WIFI_CAPTURE_NAMES}"
-else
-    log "ERROR: Adapter configuration not found at \${ADAPTERS_CONF}"
-    log "Please run: sudo /path/to/install.sh --configure"
-    exit 1
-fi
-
-# Determine mode from environment or default
-MODE="\${KISMET_MODE:-normal}"
-
-# Create organized log directory structure: ~/kismet/logs/<mode>/<date>/
-TODAY=\$(date '+%Y-%m-%d')
-KISMET_DIR="\${KISMET_BASE}/logs/\${MODE}/\${TODAY}"
-mkdir -p "\$KISMET_DIR"
-
-log "Log directory: \$KISMET_DIR"
-
-cd "\$KISMET_DIR"
-
-# Check GPS status
-log "Checking GPS status..."
-GPS_STATUS=\$(gpspipe -w -n 1 2>/dev/null | grep -o '"mode":[0-9]' | head -1 || true)
-if [[ "\$GPS_STATUS" == *"3"* ]]; then
-    log "GPS status: 3D Fix"
-elif [[ "\$GPS_STATUS" == *"2"* ]]; then
-    log "GPS status: 2D Fix"
-else
-    log "GPS status: No fix (searching for satellites)"
-fi
-
-# Try to sync time from GPS
-log "Attempting GPS time synchronization..."
-GPS_TIME=\$(gpspipe -w -n 5 2>/dev/null | grep -o '"time":"[^"]*"' | head -1 | cut -d'"' -f4 || true)
-if [[ -n "\$GPS_TIME" ]]; then
-    log "GPS time received: \$GPS_TIME"
-    date -s "\$GPS_TIME" 2>/dev/null && log "System time synchronized from GPS" || log "Could not set system time"
-fi
-
-log "Starting Kismet in \$MODE mode..."
-
-# Build capture interface arguments dynamically
-CAPTURE_ARGS=""
-for i in "\${!WIFI_CAPTURE_INTERFACES[@]}"; do
-    iface="\${WIFI_CAPTURE_INTERFACES[\$i]}"
-    name="\${WIFI_CAPTURE_NAMES[\$i]}"
-    # Use persistent name if available, otherwise use original interface name
-    if [[ -e "/sys/class/net/warpie_cap\${i}" ]]; then
-        CAPTURE_ARGS="\${CAPTURE_ARGS} -c warpie_cap\${i}:name=\${name}"
-    else
-        CAPTURE_ARGS="\${CAPTURE_ARGS} -c \${iface}:name=\${name}"
-    fi
-done
-
-log "Capture interfaces:\${CAPTURE_ARGS}"
-
-case "\$MODE" in
-    wardrive)
-        # shellcheck disable=SC2086
-        exec kismet --no-ncurses --override wardrive \${CAPTURE_ARGS}
-        ;;
-    *)
-        # shellcheck disable=SC2086
-        exec kismet --no-ncurses \${CAPTURE_ARGS}
-        ;;
-esac
-WARDRIVE_EOF
-
+    # Copy wardrive script from repo
+    cp "${SCRIPT_DIR}/../bin/wardrive.sh" /usr/local/bin/wardrive.sh
     chmod +x /usr/local/bin/wardrive.sh
+    log_success "Wardrive script installed"
     
     # Create systemd service - runs as non-root user in kismet group
     cat > /etc/systemd/system/wardrive.service << SERVICE_EOF
@@ -1509,23 +1427,14 @@ SERVICE_EOF
 # =============================================================================
 configure_network_service() {
     log_info "Configuring network service..."
-    
-    cat > /etc/systemd/system/warpie-network.service << 'SERVICE_EOF'
-[Unit]
-Description=WarPie Network Manager (Auto AP/Client)
-After=NetworkManager.service
-Wants=NetworkManager.service
 
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStart=/usr/local/bin/network-manager.sh
-TimeoutStartSec=120
+    # Copy network manager script from repo
+    cp "${SCRIPT_DIR}/../bin/warpie-network-manager.sh" /usr/local/bin/warpie-network-manager.sh
+    chmod +x /usr/local/bin/warpie-network-manager.sh
+    log_success "Network manager script installed"
 
-[Install]
-WantedBy=multi-user.target
-SERVICE_EOF
-
+    # Copy systemd service from repo
+    cp "${SCRIPT_DIR}/../systemd/warpie-network.service" /etc/systemd/system/warpie-network.service
     log_success "Network service configured"
 }
 
@@ -2103,14 +2012,30 @@ RECOVERY_EOF
 # =============================================================================
 enable_services() {
     log_info "Enabling services..."
-    
+
     systemctl daemon-reload
-    
+
     systemctl enable gpsd-wardriver
     systemctl enable warpie-network
-    systemctl enable wardrive
     systemctl enable warpie-control
-    
+
+    # Handle Kismet auto-start based on user configuration
+    if [[ -f "${ADAPTERS_CONF}" ]]; then
+        # shellcheck source=/dev/null
+        source "${ADAPTERS_CONF}"
+
+        if [[ "${KISMET_AUTOSTART:-true}" == "true" ]]; then
+            log_info "Kismet auto-start ENABLED (Field Deployment mode)"
+            systemctl enable wardrive
+        else
+            log_info "Kismet auto-start DISABLED (Manual start from web app)"
+            systemctl disable wardrive 2>/dev/null || true
+        fi
+    else
+        log_warn "Adapter config not found, enabling wardrive by default"
+        systemctl enable wardrive
+    fi
+
     log_success "Services enabled"
 }
 
