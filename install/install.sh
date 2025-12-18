@@ -2289,61 +2289,165 @@ uninstall() {
     echo "WarPie Uninstaller"
     echo "============================================================================="
     echo ""
-    
-    echo -e "${YELLOW}This will remove all WarPie components.${NC}"
+
+    echo -e "${YELLOW}This will remove all WarPie components and revert system changes.${NC}"
+    echo ""
+    echo "The following will be removed:"
+    echo "  - All WarPie systemd services"
+    echo "  - All WarPie scripts from /usr/local/bin/"
+    echo "  - Kismet configuration files"
+    echo "  - hostapd and dnsmasq configurations"
+    echo "  - udev interface naming rules"
+    echo "  - Kismet APT repository"
+    echo ""
     read -p "Are you sure? (yes/no): " confirm
-    
+
     if [[ "$confirm" != "yes" ]]; then
         echo "Uninstall cancelled."
         exit 0
     fi
-    
+
+    # -------------------------------------------------------------------------
+    # Stop all WarPie services
+    # -------------------------------------------------------------------------
     log_info "Stopping services..."
     systemctl stop wardrive 2>/dev/null || true
     systemctl stop warpie-control 2>/dev/null || true
     systemctl stop warpie-network 2>/dev/null || true
     systemctl stop gpsd-wardriver 2>/dev/null || true
-    
+
+    # Also stop any running hostapd/dnsmasq instances we may have started
+    pkill -f "hostapd.*warpie" 2>/dev/null || true
+    pkill -f "dnsmasq.*warpie" 2>/dev/null || true
+
+    # -------------------------------------------------------------------------
+    # Disable all WarPie services
+    # -------------------------------------------------------------------------
     log_info "Disabling services..."
     systemctl disable wardrive 2>/dev/null || true
     systemctl disable warpie-control 2>/dev/null || true
     systemctl disable warpie-network 2>/dev/null || true
     systemctl disable gpsd-wardriver 2>/dev/null || true
-    
+
+    # -------------------------------------------------------------------------
+    # Remove systemd service files
+    # -------------------------------------------------------------------------
     log_info "Removing service files..."
     rm -f /etc/systemd/system/wardrive.service
     rm -f /etc/systemd/system/warpie-control.service
     rm -f /etc/systemd/system/warpie-network.service
     rm -f /etc/systemd/system/gpsd-wardriver.service
     rm -rf /etc/systemd/system/wardrive.service.d
-    
-    log_info "Removing scripts..."
+
+    # -------------------------------------------------------------------------
+    # Remove all WarPie scripts
+    # -------------------------------------------------------------------------
+    log_info "Removing scripts from /usr/local/bin/..."
     rm -f /usr/local/bin/network-manager.sh
     rm -f /usr/local/bin/wardrive.sh
     rm -f /usr/local/bin/warpie-control.py
     rm -f /usr/local/bin/warpie-recovery.sh
-    
-    log_info "Removing configurations..."
-    rm -f "${KISMET_CONF_DIR}/kismet_site.conf"
-    rm -f "${KISMET_CONF_DIR}/kismet_wardrive.conf"
+    rm -f /usr/local/bin/warpie-network-manager.sh
+    rm -f /usr/local/bin/warpie-exclude-ssid.sh
+    rm -f /usr/local/bin/validate-warpie.sh
+    rm -f /usr/local/bin/warpie-filter-processor.py
+
+    # -------------------------------------------------------------------------
+    # Remove Kismet configurations
+    # -------------------------------------------------------------------------
+    log_info "Removing Kismet configurations..."
+    # Current config path
+    rm -f /etc/kismet/kismet_site.conf
+    rm -f /etc/kismet/kismet_wardrive.conf
+    rm -f /etc/kismet/kismet_targeting.conf
+    # Old config path (in case of previous installs)
+    rm -f /usr/local/etc/kismet_site.conf
+    rm -f /usr/local/etc/kismet_wardrive.conf
+    rm -f /usr/local/etc/kismet_targeting.conf
+
+    # -------------------------------------------------------------------------
+    # Remove hostapd configurations
+    # -------------------------------------------------------------------------
+    log_info "Removing hostapd configurations..."
+    rm -f /etc/hostapd/hostapd.conf
     rm -f /etc/hostapd/hostapd-wlan0.conf
-    
+
+    # -------------------------------------------------------------------------
+    # Remove udev rules and trigger interface rename revert
+    # -------------------------------------------------------------------------
+    log_info "Removing udev rules (interfaces will revert to default names on reboot)..."
+    rm -f /etc/udev/rules.d/70-warpie-wifi.rules
+    udevadm control --reload-rules 2>/dev/null || true
+    udevadm trigger 2>/dev/null || true
+
+    # -------------------------------------------------------------------------
+    # Restore NetworkManager control of WiFi interfaces
+    # -------------------------------------------------------------------------
+    log_info "Restoring NetworkManager control of WiFi interfaces..."
+    # Try both old and new interface names
+    for iface in wlan0 wlan1 wlan2 warpie_ap warpie_cap0 warpie_cap1 warpie_cap2; do
+        if [[ -e "/sys/class/net/${iface}" ]]; then
+            nmcli device set "${iface}" managed yes 2>/dev/null || true
+        fi
+    done
+
+    # -------------------------------------------------------------------------
+    # Restore default gpsd service
+    # -------------------------------------------------------------------------
+    log_info "Restoring default gpsd service..."
+    systemctl unmask gpsd 2>/dev/null || true
+    systemctl enable gpsd 2>/dev/null || true
+
+    # -------------------------------------------------------------------------
+    # Remove Kismet APT repository (optional)
+    # -------------------------------------------------------------------------
     echo ""
-    read -p "Remove user data (BSSIDs, logs)? (yes/no): " remove_data
-    if [[ "$remove_data" == "yes" ]]; then
-        rm -rf "${WARPIE_DIR}"
-        rm -rf "${LOG_DIR}"
-        log_info "User data removed"
-    else
-        log_info "User data preserved in ${WARPIE_DIR}"
+    read -p "Remove Kismet APT repository? (yes/no): " remove_repo
+    if [[ "$remove_repo" == "yes" ]]; then
+        log_info "Removing Kismet APT repository..."
+        rm -f /etc/apt/sources.list.d/kismet.list
+        apt-get update -qq 2>/dev/null || true
     fi
-    
+
+    # -------------------------------------------------------------------------
+    # Remove user data (optional)
+    # -------------------------------------------------------------------------
+    echo ""
+    read -p "Remove user data (config, BSSIDs, logs)? (yes/no): " remove_data
+    if [[ "$remove_data" == "yes" ]]; then
+        log_info "Removing user data..."
+        rm -rf /etc/warpie
+        rm -rf /var/log/warpie
+
+        # Optionally remove Kismet logs
+        read -p "Remove Kismet capture logs in ~/kismet/? (yes/no): " remove_kismet_logs
+        if [[ "$remove_kismet_logs" == "yes" ]]; then
+            local kismet_user="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
+            rm -rf "/home/${kismet_user}/kismet"
+            log_info "Kismet logs removed"
+        fi
+    else
+        log_info "User data preserved in /etc/warpie"
+    fi
+
+    # -------------------------------------------------------------------------
+    # Reload systemd to apply changes
+    # -------------------------------------------------------------------------
     log_info "Reloading systemd..."
     systemctl daemon-reload
-    
-    systemctl unmask gpsd 2>/dev/null || true
-    
-    log_success "WarPie uninstalled"
+
+    # -------------------------------------------------------------------------
+    # Summary
+    # -------------------------------------------------------------------------
+    echo ""
+    log_success "WarPie uninstalled successfully"
+    echo ""
+    echo "Notes:"
+    echo "  - WiFi interfaces will revert to default names (wlan0, wlan1, etc.) after reboot"
+    echo "  - Kismet and other packages (hostapd, dnsmasq, gpsd) were NOT uninstalled"
+    echo "  - To remove packages: sudo apt remove kismet hostapd dnsmasq gpsd"
+    echo ""
+    echo "A reboot is recommended to fully revert interface names."
 }
 
 # =============================================================================
