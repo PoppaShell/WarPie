@@ -119,6 +119,10 @@ switch_to_client_mode() {
         systemctl stop dnsmasq || log WARN "Failed to stop dnsmasq"
     fi
 
+    # Flush any existing IP addresses (removes AP mode static IP)
+    log INFO "Flushing existing IP addresses..."
+    ip addr flush dev "${WIFI_AP}" 2>/dev/null || true
+
     # Configure wpa_supplicant for home WiFi
     log INFO "Configuring wpa_supplicant for ${HOME_WIFI_SSID}..."
 
@@ -141,19 +145,19 @@ EOF
         log WARN "wpa_supplicant already running or failed to start"
     }
 
-    # Request DHCP address
-    log INFO "Requesting DHCP address..."
-    dhclient -v "${WIFI_AP}" 2>&1 | head -5 | while read -r line; do
+    # Request DHCP address using dhcpcd (standard on Raspberry Pi OS)
+    log INFO "Requesting DHCP address via dhcpcd..."
+    dhcpcd -n "${WIFI_AP}" 2>&1 | while read -r line; do
         log INFO "DHCP: ${line}"
     done
 
     # Wait for connection
     sleep 5
 
-    # Check if we got an IP
-    if ip addr show "${WIFI_AP}" | grep -q "inet "; then
-        local ip_address
-        ip_address=$(ip addr show "${WIFI_AP}" | grep "inet " | awk '{print $2}' | cut -d'/' -f1)
+    # Check if we got an IP (exclude 10.0.0.x which is the AP range)
+    local ip_address
+    ip_address=$(ip addr show "${WIFI_AP}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | cut -d'/' -f1 | head -1)
+    if [[ -n "${ip_address}" ]]; then
         log SUCCESS "Connected to home WiFi: ${HOME_WIFI_SSID} (IP: ${ip_address})"
         CURRENT_MODE="client"
         return 0
@@ -173,10 +177,12 @@ switch_to_ap_mode() {
         kill "$(cat /var/run/wpa_supplicant.pid)" 2>/dev/null || true
         rm -f /var/run/wpa_supplicant.pid
     fi
+    # Also kill any wpa_supplicant processes we didn't start
+    pkill -f "wpa_supplicant.*${WIFI_AP}" 2>/dev/null || true
 
-    # Release DHCP lease
+    # Release DHCP lease using dhcpcd
     log INFO "Releasing DHCP lease..."
-    dhclient -r "${WIFI_AP}" 2>/dev/null || true
+    dhcpcd -k "${WIFI_AP}" 2>/dev/null || true
 
     # Configure static IP for AP
     log INFO "Configuring static IP for AP..."
@@ -209,16 +215,29 @@ switch_to_ap_mode() {
 
 # Get current mode
 detect_current_mode() {
-    # Check if wpa_supplicant is running (client mode)
-    if pgrep -f "wpa_supplicant.*${WIFI_AP}" >/dev/null 2>&1; then
+    # Check if hostapd is running (AP mode) - check this first as it's more definitive
+    if systemctl is-active --quiet hostapd; then
+        CURRENT_MODE="ap"
+        return
+    fi
+
+    # Check if we have a non-AP IP address on the interface (client mode)
+    # This is more reliable than checking for wpa_supplicant process
+    local client_ip
+    client_ip=$(ip addr show "${WIFI_AP}" 2>/dev/null | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | head -1)
+    if [[ -n "${client_ip}" ]]; then
         CURRENT_MODE="client"
         return
     fi
 
-    # Check if hostapd is running (AP mode)
-    if systemctl is-active --quiet hostapd; then
-        CURRENT_MODE="ap"
-        return
+    # Check if wpa_supplicant is running for this interface
+    if pgrep -f "wpa_supplicant" >/dev/null 2>&1; then
+        # wpa_supplicant is running, but we may not have an IP yet
+        # Check if interface is associated
+        if iw dev "${WIFI_AP}" link 2>/dev/null | grep -q "Connected"; then
+            CURRENT_MODE="client"
+            return
+        fi
     fi
 
     # No mode active
