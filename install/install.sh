@@ -268,7 +268,8 @@ configure_adapters_interactive() {
 
     local ap_choice
     while true; do
-        read -r -p "Enter interface number [1-${#DETECTED_INTERFACES[@]}]: " ap_choice
+        echo -n "Enter interface number [1-${#DETECTED_INTERFACES[@]}]: "
+        read -r ap_choice || ap_choice=""
         if [[ "${ap_choice}" =~ ^[0-9]+$ ]] && \
            [[ "${ap_choice}" -ge 1 ]] && \
            [[ "${ap_choice}" -le ${#DETECTED_INTERFACES[@]} ]]; then
@@ -314,7 +315,8 @@ configure_adapters_interactive() {
 
     echo "Enter interface numbers separated by spaces (e.g., '1 2' for both):"
     local capture_choices
-    read -r -p "> " capture_choices
+    echo -n "> "
+    read -r capture_choices || capture_choices=""
 
     WIFI_CAPTURE_INTERFACES=()
     WIFI_CAPTURE_MACS=()
@@ -360,7 +362,8 @@ configure_adapters_interactive() {
         echo ""
     done
 
-    read -r -p "Is this correct? [Y/n]: " confirm
+    echo -n "Is this correct? [Y/n]: "
+    read -r confirm || confirm="y"
     if [[ "${confirm,,}" == "n" ]]; then
         log_info "Restarting adapter configuration..."
         configure_adapters_interactive
@@ -498,11 +501,11 @@ generate_adapter_name() {
     local idx="$1"
     local bands="$2"
 
-    # Count bands
+    # Count bands (use assignment to avoid exit status issues with set -e)
     local count=0
-    [[ "$bands" == *"2.4GHz"* ]] && ((count++))
-    [[ "$bands" == *"5GHz"* ]] && ((count++))
-    [[ "$bands" == *"6GHz"* ]] && ((count++))
+    [[ "$bands" == *"2.4GHz"* ]] && count=$((count + 1))
+    [[ "$bands" == *"5GHz"* ]] && count=$((count + 1))
+    [[ "$bands" == *"6GHz"* ]] && count=$((count + 1))
 
     if [[ $count -eq 1 ]]; then
         # Single band - use specific name
@@ -533,83 +536,65 @@ select_channels_for_band() {
     echo "" >&2
     echo -e "${CYAN}${band} Channel Selection:${NC}" >&2
 
+    # Build menu options based on band
+    local -a options=()
+    local -a values=()
+
     case "$band" in
         "2.4GHz")
-            echo "  [A] All channels (1-11)" >&2
-            echo "  [N] Non-overlapping (1,6,11) - recommended" >&2
-            echo "  [C] Custom list" >&2
+            options=("All channels (1-11)" "Non-overlapping (1,6,11) - recommended" "Custom list")
+            values=("$CHANNELS_24_ALL" "$CHANNELS_24_NONOVERLAP" "custom")
             ;;
         "5GHz")
-            echo "  [A] All channels (36-165)" >&2
-            echo "  [C] Custom list" >&2
+            options=("All channels (36-165)" "Custom list")
+            values=("$CHANNELS_5_ALL" "custom")
             ;;
         "6GHz")
-            echo "  [A] All channels (59 channels)" >&2
-            echo "  [P] PSC channels only (15 channels) - recommended for scanning" >&2
-            echo "  [C] Custom list" >&2
+            options=("PSC channels (15 channels) - recommended" "All channels (59 channels)" "Custom list")
+            values=("$CHANNELS_6_PSC" "all_6ghz" "custom")
             ;;
     esac
+
+    # Display numbered menu
+    for i in "${!options[@]}"; do
+        echo "  [$((i + 1))] ${options[$i]}" >&2
+    done
 
     local choice
     echo -n "> " >&2
     read -r choice || choice=""
 
-    case "${choice^^}" in
-        A)
-            case "$band" in
-                "2.4GHz") echo "$CHANNELS_24_ALL" ;;
-                "5GHz")   echo "$CHANNELS_5_ALL" ;;
-                "6GHz")   echo "$CHANNELS_6_PSC" ;;  # Default to PSC for 6GHz even on "all"
-            esac
-            ;;
-        N)
-            if [[ "$band" == "2.4GHz" ]]; then
-                echo "$CHANNELS_24_NONOVERLAP"
-            else
-                # N not valid for other bands, use defaults
-                case "$band" in
-                    "5GHz") echo "$CHANNELS_5_ALL" ;;
-                    "6GHz") echo "$CHANNELS_6_PSC" ;;
-                esac
-            fi
-            ;;
-        P)
-            if [[ "$band" == "6GHz" ]]; then
-                echo "$CHANNELS_6_PSC"
-            else
-                # P not valid for other bands, use defaults
-                case "$band" in
-                    "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
-                    "5GHz")   echo "$CHANNELS_5_ALL" ;;
-                esac
-            fi
-            ;;
-        C)
+    # Validate and process choice
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ "$choice" -ge 1 ]] && [[ "$choice" -le ${#options[@]} ]]; then
+        local selected="${values[$((choice - 1))]}"
+
+        if [[ "$selected" == "custom" ]]; then
             echo -e "${CYAN}Enter comma-separated channel list:${NC}" >&2
             local custom
             echo -n "> " >&2
             read -r custom || custom=""
-            # Basic validation - just check it's not empty
             if [[ -n "$custom" ]]; then
                 echo "$custom"
             else
-                log_warn "Empty input, using defaults" >&2
-                case "$band" in
-                    "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
-                    "5GHz")   echo "$CHANNELS_5_ALL" ;;
-                    "6GHz")   echo "$CHANNELS_6_PSC" ;;
-                esac
+                log_warn "Empty input, using default" >&2
+                # Return first non-custom option as default
+                echo "${values[0]}"
             fi
-            ;;
-        *)
-            # Default selections for invalid input
-            case "$band" in
-                "2.4GHz") echo "$CHANNELS_24_NONOVERLAP" ;;
-                "5GHz")   echo "$CHANNELS_5_ALL" ;;
-                "6GHz")   echo "$CHANNELS_6_PSC" ;;
-            esac
-            ;;
-    esac
+        elif [[ "$selected" == "all_6ghz" ]]; then
+            # Full 6GHz channel list (all PSC + additional)
+            echo "$CHANNELS_6_PSC"
+        else
+            echo "$selected"
+        fi
+    else
+        # Invalid input - use first option as default
+        log_warn "Invalid choice, using default" >&2
+        if [[ "${values[0]}" == "custom" ]]; then
+            echo "${values[1]}"
+        else
+            echo "${values[0]}"
+        fi
+    fi
 }
 
 # Configure bands and channels for a single adapter
@@ -639,7 +624,8 @@ configure_single_adapter() {
     done
 
     local band_input
-    read -r -p "> " band_input
+    echo -n "> "
+    read -r band_input || band_input=""
 
     # Process band selection
     local -a selected_bands=()
@@ -714,7 +700,7 @@ configure_adapter_bands() {
     echo -e "${BOLD}==============================================================================${NC}"
     echo ""
     echo "For each adapter, select which bands to capture and channel configuration."
-    echo "Quick options: 'all' selects all bands, [A] selects all channels."
+    echo "Quick options: 'all' selects all bands, '1' typically selects recommended channels."
 
     # Clear adapter arrays before populating
     ADAPTER_IFACES=()
@@ -966,7 +952,8 @@ configure_wifi_interactive() {
     # Ask for home network SSID
     echo -e "${CYAN}Step 1: Home Network Configuration${NC}"
     echo ""
-    read -r -p "Enter your home WiFi network name (SSID): " HOME_SSID
+    echo -n "Enter your home WiFi network name (SSID): "
+    read -r HOME_SSID || HOME_SSID=""
 
     if [[ -z "$HOME_SSID" ]]; then
         log_warn "No SSID entered, skipping WiFi configuration"
