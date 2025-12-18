@@ -257,7 +257,7 @@ configure_adapters_interactive() {
     local config_script="${SCRIPT_DIR}/warpie_config.py"
     if [[ ! -f "${config_script}" ]]; then
         log_info "Downloading warpie_config.py..."
-        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local branch="${WARPIE_BRANCH:-main}"
         local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/install/warpie_config.py"
         if ! curl -sSL "${url}" -o "${config_script}"; then
             log_error "Failed to download warpie_config.py"
@@ -1435,7 +1435,7 @@ configure_wardrive_service() {
     local wardrive_script="${SCRIPT_DIR}/../bin/wardrive.sh"
     if [[ ! -f "${wardrive_script}" ]]; then
         log_info "Downloading wardrive.sh..."
-        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local branch="${WARPIE_BRANCH:-main}"
         local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/bin/wardrive.sh"
         if ! curl -sSL "${url}" -o /usr/local/bin/wardrive.sh; then
             log_error "Failed to download wardrive.sh"
@@ -1481,7 +1481,7 @@ configure_network_service() {
     local manager_script="${SCRIPT_DIR}/../bin/warpie-network-manager.sh"
     if [[ ! -f "${manager_script}" ]]; then
         log_info "Downloading warpie-network-manager.sh..."
-        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local branch="${WARPIE_BRANCH:-main}"
         local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/bin/warpie-network-manager.sh"
         if ! curl -sSL "${url}" -o /usr/local/bin/warpie-network-manager.sh; then
             log_error "Failed to download warpie-network-manager.sh"
@@ -1497,7 +1497,7 @@ configure_network_service() {
     local service_file="${SCRIPT_DIR}/../systemd/warpie-network.service"
     if [[ ! -f "${service_file}" ]]; then
         log_info "Downloading warpie-network.service..."
-        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local branch="${WARPIE_BRANCH:-main}"
         local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/systemd/warpie-network.service"
         if ! curl -sSL "${url}" -o /etc/systemd/system/warpie-network.service; then
             log_error "Failed to download warpie-network.service"
