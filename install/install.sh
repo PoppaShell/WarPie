@@ -905,28 +905,64 @@ configure_wifi_interactive() {
         FOUND_ENTRIES+=("$current_bssid|$current_ssid|$current_signal")
     fi
     
-    if [[ ${#FOUND_BSSIDS[@]} -eq 0 ]]; then
+    while [[ ${#FOUND_BSSIDS[@]} -eq 0 ]]; do
         log_warn "No networks found matching '$HOME_SSID'"
         echo ""
         echo "Options:"
-        echo "  1. Enter BSSID manually"
-        echo "  2. Skip WiFi configuration"
+        echo "  1. Re-scan for networks"
+        echo "  2. Enter BSSID manually"
+        echo "  3. Skip WiFi configuration"
         echo ""
-        read -p "Choice [1/2]: " choice
-        
-        if [[ "$choice" == "1" ]]; then
-            read -p "Enter BSSID (format XX:XX:XX:XX:XX:XX): " manual_bssid
-            if [[ "$manual_bssid" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
-                FOUND_BSSIDS+=("$manual_bssid")
-                FOUND_ENTRIES+=("$manual_bssid|$HOME_SSID|manual")
-            else
-                log_error "Invalid BSSID format"
+        read -p "Choice [1/2/3]: " choice
+
+        case "$choice" in
+            1)
+                log_info "Re-scanning for networks matching '$HOME_SSID'..."
+                sleep 2
+                SCAN_RESULTS=$(iw dev "${scan_iface}" scan 2>/dev/null || true)
+
+                # Re-parse scan results
+                current_bssid=""
+                current_ssid=""
+                current_signal=""
+
+                while IFS= read -r line; do
+                    if [[ "$line" =~ ^BSS[[:space:]]([0-9a-fA-F:]+) ]]; then
+                        if [[ -n "$current_bssid" && "$current_ssid" == "$HOME_SSID" ]]; then
+                            FOUND_BSSIDS+=("$current_bssid")
+                            FOUND_ENTRIES+=("$current_bssid|$current_ssid|$current_signal")
+                        fi
+                        current_bssid="${BASH_REMATCH[1]}"
+                        current_ssid=""
+                        current_signal=""
+                    elif [[ "$line" =~ SSID:[[:space:]]*(.*) ]]; then
+                        current_ssid="${BASH_REMATCH[1]}"
+                    elif [[ "$line" =~ signal:[[:space:]]*(.*)dBm ]]; then
+                        current_signal="${BASH_REMATCH[1]}"
+                    fi
+                done <<< "$SCAN_RESULTS"
+
+                if [[ -n "$current_bssid" && "$current_ssid" == "$HOME_SSID" ]]; then
+                    FOUND_BSSIDS+=("$current_bssid")
+                    FOUND_ENTRIES+=("$current_bssid|$current_ssid|$current_signal")
+                fi
+                ;;
+            2)
+                read -p "Enter BSSID (format XX:XX:XX:XX:XX:XX): " manual_bssid
+                if [[ "$manual_bssid" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
+                    FOUND_BSSIDS+=("$manual_bssid")
+                    FOUND_ENTRIES+=("$manual_bssid|$HOME_SSID|manual")
+                else
+                    log_error "Invalid BSSID format"
+                fi
+                ;;
+            3|*)
                 return 1
-            fi
-        else
-            return 1
-        fi
-    else
+                ;;
+        esac
+    done
+
+    if [[ ${#FOUND_BSSIDS[@]} -gt 0 ]]; then
         echo ""
         log_success "Found ${#FOUND_BSSIDS[@]} access point(s) for '$HOME_SSID':"
         echo ""
