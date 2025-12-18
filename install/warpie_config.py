@@ -145,7 +145,7 @@ def detect_bands(interface: str) -> list[str]:
         output = result.stdout
 
         # Use regex to find all frequencies in MHz
-        freq_matches = re.findall(r'(\d{4,5})\s*MHz', output)
+        freq_matches = re.findall(r"(\d{4,5})\s*MHz", output)
         frequencies = [int(f) for f in freq_matches]
 
         # Check which bands are present based on frequency ranges
