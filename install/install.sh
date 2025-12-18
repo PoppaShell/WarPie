@@ -35,7 +35,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WARPIE_USER="${SUDO_USER:-pi}"
 WARPIE_DIR="/etc/warpie"
 LOG_DIR="/var/log/warpie"
-KISMET_CONF_DIR="/usr/local/etc"
+KISMET_CONF_DIR="/etc/kismet"
 ADAPTERS_CONF="${WARPIE_DIR}/adapters.conf"
 UDEV_RULES="/etc/udev/rules.d/70-warpie-wifi.rules"
 
