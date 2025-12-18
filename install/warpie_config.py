@@ -19,6 +19,7 @@ try:
     from InquirerPy.separator import Separator
     from rich.console import Console
     from rich.table import Table
+    from rich.panel import Panel
 except ImportError:
     print("Installing required packages...")
     subprocess.check_call([sys.executable, "-m", "pip", "install",
@@ -27,6 +28,7 @@ except ImportError:
     from InquirerPy.separator import Separator
     from rich.console import Console
     from rich.table import Table
+    from rich.panel import Panel
 
 console = Console()
 
@@ -144,11 +146,18 @@ def detect_bands(interface: str) -> list[str]:
         )
 
         output = result.stdout
-        if "2407 MHz" in output or "2412 MHz" in output:
+
+        # Check for frequency ranges instead of specific values
+        # 2.4GHz: 2401-2495 MHz (channels 1-14)
+        if any(f"{freq} MHz" in output for freq in range(2401, 2496)):
             bands.append("2.4GHz")
-        if "5180 MHz" in output or "5745 MHz" in output:
+
+        # 5GHz: 5150-5895 MHz (all 5GHz channels)
+        if any(f"{freq} MHz" in output for freq in range(5150, 5896, 5)):
             bands.append("5GHz")
-        if "5955 MHz" in output or "6115 MHz" in output:
+
+        # 6GHz: 5925-7125 MHz (WiFi 6E)
+        if any(f"{freq} MHz" in output for freq in range(5925, 7126, 5)):
             bands.append("6GHz")
 
     except Exception:
@@ -180,9 +189,14 @@ def display_adapters(adapters: list[WifiAdapter]) -> None:
 
 def select_ap_interface(adapters: list[WifiAdapter]) -> WifiAdapter:
     """Select the Access Point interface."""
-    console.print("\n[bold cyan]Step 1: Select Access Point Interface[/bold cyan]")
-    console.print("Which interface should be used for the WarPie AP and home WiFi connection?")
-    console.print("[dim](Usually the Raspberry Pi's internal WiFi - look for 'Broadcom')[/dim]\n")
+    console.print()
+    console.print(Panel.fit(
+        "[bold white]Step 1 of 3: Select Access Point Interface[/bold white]\n\n"
+        "Which interface should be used for the WarPie AP and home WiFi connection?\n"
+        "[dim]→ Usually the Raspberry Pi's internal WiFi (look for 'Broadcom')[/dim]\n"
+        "[dim]→ This adapter will NOT be used for wardriving[/dim]",
+        border_style="cyan"
+    ))
 
     choices = [
         {
@@ -195,6 +209,7 @@ def select_ap_interface(adapters: list[WifiAdapter]) -> WifiAdapter:
     return inquirer.select(
         message="Select AP interface:",
         choices=choices,
+        instruction="↑↓ Navigate | Enter Select | ? Help"
     ).execute()
 
 
@@ -203,9 +218,15 @@ def select_capture_interfaces(
     exclude: WifiAdapter
 ) -> list[WifiAdapter]:
     """Select capture interfaces (multi-select with checkboxes)."""
-    console.print("\n[bold cyan]Step 2: Select Capture Interface(s)[/bold cyan]")
-    console.print("Which interface(s) should be used for Kismet capture?")
-    console.print("[dim](Select all external USB adapters for wardriving)[/dim]\n")
+    console.print()
+    console.print(Panel.fit(
+        "[bold white]Step 2 of 3: Select Capture Interface(s)[/bold white]\n\n"
+        "Which interface(s) should be used for Kismet wardriving?\n"
+        "[dim]→ Select all external USB adapters[/dim]\n"
+        "[dim]→ You can select multiple interfaces[/dim]\n"
+        "[dim]→ Use Space to toggle, Enter to confirm[/dim]",
+        border_style="cyan"
+    ))
 
     available = [a for a in adapters if a.interface != exclude.interface]
 
@@ -226,19 +247,35 @@ def select_capture_interfaces(
         choices=choices,
         validate=lambda result: len(result) > 0,
         invalid_message="Select at least one interface",
+        instruction="Space Toggle | Enter Confirm",
     ).execute()
 
-    console.print(f"[green]Selected {len(selected)} capture interface(s)[/green]")
+    # Show clean summary of selections
+    console.print(f"\n[green]✓ Selected {len(selected)} capture interface(s):[/green]")
+    for adapter in selected:
+        console.print(f"  [cyan]•[/cyan] {adapter.interface} - {adapter.driver_name}")
+
     return selected
 
 
 def select_bands(adapter: WifiAdapter) -> list[str]:
     """Select which bands to capture for an adapter."""
     if len(adapter.bands) == 1:
-        # Only one band available, auto-select
+        # Only one band available, auto-select but inform user
+        console.print(f"[dim]   → Only {adapter.bands[0]} available, auto-selected[/dim]")
         return adapter.bands.copy()
 
-    choices = [{"name": band, "value": band} for band in adapter.bands]
+    # Add helpful descriptions for each band
+    band_descriptions = {
+        "2.4GHz": "2.4GHz (Better range, more interference)",
+        "5GHz": "5GHz (Faster, less interference, shorter range)",
+        "6GHz": "6GHz (WiFi 6E, newest, requires compatible hardware)"
+    }
+
+    choices = [
+        {"name": band_descriptions.get(band, band), "value": band}
+        for band in adapter.bands
+    ]
 
     return inquirer.checkbox(
         message=f"Select bands for {adapter.interface}:",
@@ -246,6 +283,7 @@ def select_bands(adapter: WifiAdapter) -> list[str]:
         default=adapter.bands,  # All selected by default
         validate=lambda result: len(result) > 0,
         invalid_message="Select at least one band",
+        instruction="Space Toggle | Enter Confirm | All selected by default",
     ).execute()
 
 
@@ -306,10 +344,16 @@ def generate_adapter_name(index: int, bands: list[str]) -> str:
         return f"WiFi_TriBand_{index}"
 
 
-def configure_adapter(adapter: WifiAdapter, index: int) -> AdapterConfig:
+def configure_adapter(adapter: WifiAdapter, index: int, total: int) -> AdapterConfig:
     """Configure bands and channels for a single adapter."""
-    console.print(f"\n[bold]━━━ Adapter {index + 1}: {adapter.interface} - {adapter.driver_name} ━━━[/bold]")
-    console.print(f"    Capable bands: [cyan]{adapter.bands_str}[/cyan]\n")
+    console.print()
+    console.print(Panel.fit(
+        f"[bold white]Step 3 of 3: Configure Adapter {index + 1} of {total}[/bold white]\n\n"
+        f"[cyan]Interface:[/cyan] {adapter.interface}\n"
+        f"[cyan]Device:[/cyan] {adapter.driver_name}\n"
+        f"[cyan]Capable bands:[/cyan] {adapter.bands_str}",
+        border_style="yellow"
+    ))
 
     # Select bands
     selected_bands = select_bands(adapter)
@@ -418,25 +462,55 @@ def main():
 
     # Step 3: Configure each capture adapter
     console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
-    console.print("[bold cyan]  Step 3: Configure Capture Adapter Bands[/bold cyan]")
+    console.print("[bold cyan]  Configure Capture Adapters[/bold cyan]")
     console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
     console.print("\nFor each adapter, select bands and channel configuration.")
 
     configs = []
+    total_adapters = len(capture_adapters)
     for i, adapter in enumerate(capture_adapters):
-        config = configure_adapter(adapter, i)
+        config = configure_adapter(adapter, i, total_adapters)
         configs.append(config)
 
     # Confirm
-    console.print("\n[bold]═══════════════════════════════════════════════════════════════[/bold]")
-    console.print("[bold]  Configuration Summary[/bold]")
-    console.print("[bold]═══════════════════════════════════════════════════════════════[/bold]")
-    console.print(f"\nAP Interface: [cyan]{ap.interface}[/cyan] ({ap.driver_name})")
-    console.print(f"Capture Interfaces: [cyan]{len(configs)}[/cyan]")
-    for cfg in configs:
-        console.print(f"  • {cfg.interface} → {cfg.name}")
+    console.print()
+    console.print(Panel.fit(
+        "[bold white]Configuration Summary[/bold white]\n\n"
+        "Review your configuration before saving:",
+        border_style="green"
+    ))
 
-    if inquirer.confirm(message="Save this configuration?", default=True).execute():
+    # Create detailed summary table
+    summary_table = Table(show_header=True, header_style="bold cyan", box=None)
+    summary_table.add_column("Setting", style="dim")
+    summary_table.add_column("Value", style="white")
+
+    summary_table.add_row("AP Interface", f"{ap.interface} ({ap.driver_name})")
+    summary_table.add_row("Capture Adapters", str(len(configs)))
+    summary_table.add_row("", "")  # Spacer
+
+    for i, cfg in enumerate(configs, 1):
+        summary_table.add_row(f"[bold]Adapter {i}[/bold]", "")
+        summary_table.add_row("  Interface", cfg.interface)
+        summary_table.add_row("  Name", cfg.name)
+        summary_table.add_row("  Bands", ", ".join(cfg.enabled_bands))
+        if cfg.channels_24:
+            summary_table.add_row("  2.4GHz Channels", cfg.channels_24)
+        if cfg.channels_5:
+            summary_table.add_row("  5GHz Channels", cfg.channels_5)
+        if cfg.channels_6:
+            summary_table.add_row("  6GHz Channels", cfg.channels_6)
+        if i < len(configs):
+            summary_table.add_row("", "")  # Spacer between adapters
+
+    console.print(summary_table)
+    console.print()
+
+    if inquirer.confirm(
+        message="Save this configuration?",
+        default=True,
+        instruction="Y/n"
+    ).execute():
         save_config(ap, configs)
         return 0
     else:
