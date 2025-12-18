@@ -1,0 +1,24 @@
+[Unit]
+Description=WarPie Intelligent WiFi Network Manager
+Documentation=https://github.com/yourusername/warpie
+After=network-pre.target
+Before=network.target hostapd.service dnsmasq.service
+Wants=network-pre.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/warpie-network-manager.sh
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=false
+PrivateTmp=true
+
+# Environment
+Environment="PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+[Install]
+WantedBy=multi-user.target
