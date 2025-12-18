@@ -800,19 +800,50 @@ configure_kismet_permissions() {
 configure_wifi_interactive() {
     echo ""
     echo -e "${BOLD}==============================================================================${NC}"
-    echo -e "${BOLD}  WiFi Network Configuration${NC}"
+    echo -e "${BOLD}  Home Network BSSID Discovery & Kismet Exclusions${NC}"
     echo -e "${BOLD}==============================================================================${NC}"
     echo ""
-    echo "This will configure:"
-    echo "  1. Your home WiFi network (for auto-connect when in range)"
-    echo "  2. Networks to exclude from Kismet logging"
-    echo ""
 
-    # Load adapter config to get AP interface for scanning
+    # Load adapter config to get AP interface and home WiFi settings
     load_adapter_config || {
         log_error "Adapter configuration not found. Run adapter configuration first."
         return 1
     }
+
+    # Check if home WiFi was configured in the Python wizard
+    local HOME_SSID=""
+    if [[ "${HOME_WIFI_ENABLED:-false}" == "true" && -n "${HOME_WIFI_SSID:-}" ]]; then
+        HOME_SSID="${HOME_WIFI_SSID}"
+        echo "Using home WiFi SSID from configuration: ${HOME_SSID}"
+        echo ""
+        echo "This will:"
+        echo "  1. Scan for all BSSIDs (access points) broadcasting '${HOME_SSID}'"
+        echo "  2. Optionally exclude them from Kismet logging"
+        echo "  3. Allow adding other networks to exclude (neighbors, work, etc.)"
+        echo ""
+    else
+        echo "Home WiFi was not configured during adapter setup."
+        echo ""
+        echo "You can still configure network exclusions for Kismet."
+        echo "(These networks won't appear in your wardriving data)"
+        echo ""
+        read -p "Configure network exclusions? [Y/n]: " config_choice
+
+        if [[ "$config_choice" =~ ^[Nn]$ ]]; then
+            log_info "Skipping WiFi configuration"
+            return 0
+        fi
+
+        # Ask for SSID to exclude
+        echo ""
+        echo -n "Enter WiFi network name (SSID) to exclude: "
+        read -r HOME_SSID || HOME_SSID=""
+
+        if [[ -z "$HOME_SSID" ]]; then
+            log_warn "No SSID entered, skipping WiFi configuration"
+            return 0
+        fi
+    fi
 
     # Determine scan interface (prefer persistent name if available)
     local scan_iface
@@ -826,16 +857,9 @@ configure_wifi_interactive() {
     ip link set "${scan_iface}" up 2>/dev/null || true
     sleep 2
 
-    # Ask for home network SSID
-    echo -e "${CYAN}Step 1: Home Network Configuration${NC}"
+    # Scan for BSSIDs
+    echo -e "${CYAN}Step 1: Scanning for BSSIDs${NC}"
     echo ""
-    echo -n "Enter your home WiFi network name (SSID): "
-    read -r HOME_SSID || HOME_SSID=""
-
-    if [[ -z "$HOME_SSID" ]]; then
-        log_warn "No SSID entered, skipping WiFi configuration"
-        return 1
-    fi
 
     echo ""
     log_info "Scanning for networks matching '$HOME_SSID' using ${scan_iface}..."
@@ -1406,8 +1430,19 @@ WARDRIVE_EOF
 configure_wardrive_service() {
     log_info "Configuring wardrive service..."
 
-    # Copy wardrive script from repo
-    cp "${SCRIPT_DIR}/../bin/wardrive.sh" /usr/local/bin/wardrive.sh
+    # Download or copy wardrive script
+    local wardrive_script="${SCRIPT_DIR}/../bin/wardrive.sh"
+    if [[ ! -f "${wardrive_script}" ]]; then
+        log_info "Downloading wardrive.sh..."
+        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/bin/wardrive.sh"
+        if ! curl -sSL "${url}" -o /usr/local/bin/wardrive.sh; then
+            log_error "Failed to download wardrive.sh"
+            exit 1
+        fi
+    else
+        cp "${wardrive_script}" /usr/local/bin/wardrive.sh
+    fi
     chmod +x /usr/local/bin/wardrive.sh
     log_success "Wardrive script installed"
     
@@ -1441,13 +1476,35 @@ SERVICE_EOF
 configure_network_service() {
     log_info "Configuring network service..."
 
-    # Copy network manager script from repo
-    cp "${SCRIPT_DIR}/../bin/warpie-network-manager.sh" /usr/local/bin/warpie-network-manager.sh
+    # Download or copy network manager script
+    local manager_script="${SCRIPT_DIR}/../bin/warpie-network-manager.sh"
+    if [[ ! -f "${manager_script}" ]]; then
+        log_info "Downloading warpie-network-manager.sh..."
+        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/bin/warpie-network-manager.sh"
+        if ! curl -sSL "${url}" -o /usr/local/bin/warpie-network-manager.sh; then
+            log_error "Failed to download warpie-network-manager.sh"
+            exit 1
+        fi
+    else
+        cp "${manager_script}" /usr/local/bin/warpie-network-manager.sh
+    fi
     chmod +x /usr/local/bin/warpie-network-manager.sh
     log_success "Network manager script installed"
 
-    # Copy systemd service from repo
-    cp "${SCRIPT_DIR}/../systemd/warpie-network.service" /etc/systemd/system/warpie-network.service
+    # Download or copy systemd service
+    local service_file="${SCRIPT_DIR}/../systemd/warpie-network.service"
+    if [[ ! -f "${service_file}" ]]; then
+        log_info "Downloading warpie-network.service..."
+        local branch="${WARPIE_BRANCH:-feature/intelligent-wifi-management}"
+        local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/systemd/warpie-network.service"
+        if ! curl -sSL "${url}" -o /etc/systemd/system/warpie-network.service; then
+            log_error "Failed to download warpie-network.service"
+            exit 1
+        fi
+    else
+        cp "${service_file}" /etc/systemd/system/warpie-network.service
+    fi
     log_success "Network service configured"
 }
 
