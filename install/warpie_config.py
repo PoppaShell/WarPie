@@ -4,7 +4,6 @@ WarPie WiFi Adapter Configuration
 Interactive configuration using InquirerPy for beautiful prompts.
 """
 
-import re
 import subprocess
 import sys
 from dataclasses import dataclass, field
@@ -126,7 +125,11 @@ def detect_wifi_interfaces() -> list[WifiAdapter]:
 
 
 def detect_bands(interface: str) -> list[str]:
-    """Detect supported bands for an interface using iw."""
+    """Detect supported bands for an interface using iw.
+
+    Uses the reliable method of checking for Band headers in iw phy output.
+    Band 1 = 2.4GHz, Band 2 = 5GHz, Band 4 = 6GHz (WiFi 6E)
+    """
     bands = []
 
     try:
@@ -144,21 +147,15 @@ def detect_bands(interface: str) -> list[str]:
 
         output = result.stdout
 
-        # Use regex to find all frequencies in MHz
-        freq_matches = re.findall(r"(\d{4,5})\s*MHz", output)
-        frequencies = [int(f) for f in freq_matches]
-
-        # Check which bands are present based on frequency ranges
-        # 2.4GHz: 2401-2495 MHz (channels 1-14)
-        if any(2401 <= freq <= 2495 for freq in frequencies):
+        # Check for band headers (most reliable method)
+        # This matches the proven bash implementation in install.sh
+        if "Band 1:" in output:
             bands.append("2.4GHz")
 
-        # 5GHz: 5150-5895 MHz (all 5GHz channels)
-        if any(5150 <= freq <= 5895 for freq in frequencies):
+        if "Band 2:" in output:
             bands.append("5GHz")
 
-        # 6GHz: 5925-7125 MHz (WiFi 6E)
-        if any(5925 <= freq <= 7125 for freq in frequencies):
+        if "Band 4:" in output:
             bands.append("6GHz")
 
     except Exception:
