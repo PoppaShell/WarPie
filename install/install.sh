@@ -1350,16 +1350,19 @@ configure_gps() {
     systemctl stop gpsd 2>/dev/null || true
     systemctl disable gpsd 2>/dev/null || true
     systemctl mask gpsd 2>/dev/null || true
-    
-    # Create custom gpsd service
+
+    # Create custom gpsd service with device dependency for reliable startup
     cat > /etc/systemd/system/gpsd-wardriver.service << GPS_EOF
 [Unit]
 Description=GPS daemon for wardriving
+Documentation=https://github.com/PoppaShell/WarPie
 Before=wardrive.service
-After=network.target
+After=network.target dev-ttyUSB0.device
+Wants=dev-ttyUSB0.device
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sleep 2
 ExecStart=/usr/sbin/gpsd -n -N ${GPS_DEVICE}
 ExecStartPost=/bin/sleep 5
 Restart=on-failure

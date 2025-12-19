@@ -1,12 +1,12 @@
 [Unit]
 Description=WarPie Intelligent WiFi Network Manager
-Documentation=https://github.com/yourusername/warpie
+Documentation=https://github.com/PoppaShell/WarPie
 After=network-pre.target
-Before=network.target hostapd.service dnsmasq.service
 Wants=network-pre.target
 
 [Service]
 Type=simple
+ExecStartPre=/bin/sleep 3
 ExecStart=/usr/local/bin/warpie-network-manager.sh
 Restart=always
 RestartSec=10

@@ -1,0 +1,17 @@
+[Unit]
+Description=GPS daemon for wardriving
+Documentation=https://github.com/PoppaShell/WarPie
+Before=wardrive.service
+After=network.target dev-ttyUSB0.device
+Wants=dev-ttyUSB0.device
+
+[Service]
+Type=simple
+ExecStartPre=/bin/sleep 2
+ExecStart=/usr/sbin/gpsd -n -N /dev/serial/by-id/usb-Prolific_Technology_Inc._USB-Serial_Controller_D-if00-port0
+ExecStartPost=/bin/sleep 5
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
