@@ -123,6 +123,12 @@ switch_to_client_mode() {
         systemctl stop dnsmasq || log WARN "Failed to stop dnsmasq"
     fi
 
+    # Kill any existing wpa_supplicant on this interface (including NetworkManager's)
+    log INFO "Stopping any existing wpa_supplicant..."
+    pkill -f "wpa_supplicant.*${WIFI_AP}" 2>/dev/null || true
+    rm -f "/var/run/wpa_supplicant/${WIFI_AP}" 2>/dev/null || true
+    sleep 1
+
     # Flush any existing IP addresses (removes AP mode static IP)
     log INFO "Flushing existing IP addresses..."
     ip addr flush dev "${WIFI_AP}" 2>/dev/null || true
