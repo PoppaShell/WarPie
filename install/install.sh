@@ -1303,6 +1303,11 @@ configure_hostapd() {
     # Use the configured AP interface directly
     local ap_interface="${WIFI_AP}"
 
+    # Unmask hostapd - it's masked by default on Raspberry Pi OS
+    # This is required for the network manager to start AP mode
+    log_info "Unmasking hostapd service..."
+    systemctl unmask hostapd 2>/dev/null || true
+
     cat > /etc/hostapd/hostapd.conf << HOSTAPD_EOF
 # WarPie Access Point Configuration
 interface=${ap_interface}
@@ -1529,6 +1534,45 @@ configure_network_service() {
     fi
     chmod +x /usr/local/bin/warpie-network-manager.sh
     log_success "Network manager script installed"
+
+    # Load adapter config to get AP interface for dnsmasq
+    load_adapter_config || {
+        log_warn "Adapter config not found, using wlan0 for dnsmasq"
+    }
+    local ap_interface="${WIFI_AP:-wlan0}"
+
+    # Create dnsmasq configuration for AP mode
+    # Uses 10.0.0.x subnet to match network manager script
+    log_info "Creating dnsmasq configuration for AP mode..."
+    cat > /etc/dnsmasq.d/warpie-ap.conf << DNSMASQ_EOF
+# WarPie AP Mode DHCP Configuration
+# This provides DHCP to clients connecting to the WarPie AP
+
+# Only listen on the AP interface when in AP mode
+interface=${ap_interface}
+bind-interfaces
+
+# DHCP range: 10.0.0.10 - 10.0.0.50 (AP is 10.0.0.1)
+dhcp-range=10.0.0.10,10.0.0.50,255.255.255.0,12h
+
+# Set the gateway to the Pi's AP IP
+dhcp-option=option:router,10.0.0.1
+
+# Set DNS to the Pi itself (dnsmasq will forward)
+dhcp-option=option:dns-server,10.0.0.1
+
+# Don't read /etc/resolv.conf or poll it for changes
+no-resolv
+no-poll
+
+# Use Google DNS as upstream
+server=8.8.8.8
+server=8.8.4.4
+
+# Logging
+log-dhcp
+DNSMASQ_EOF
+    log_success "dnsmasq AP configuration created"
 
     # Download or copy systemd service
     local service_file="${SCRIPT_DIR}/../systemd/warpie-network.service"
@@ -2409,6 +2453,12 @@ uninstall() {
     log_info "Removing hostapd configurations..."
     rm -f /etc/hostapd/hostapd.conf
     rm -f /etc/hostapd/hostapd-wlan0.conf
+
+    # -------------------------------------------------------------------------
+    # Remove dnsmasq configuration
+    # -------------------------------------------------------------------------
+    log_info "Removing dnsmasq AP configuration..."
+    rm -f /etc/dnsmasq.d/warpie-ap.conf
 
     # -------------------------------------------------------------------------
     # Remove udev rules and trigger interface rename revert
