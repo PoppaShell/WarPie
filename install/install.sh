@@ -790,7 +790,22 @@ configure_kismet_permissions() {
     # Ensure kismet data directory is writable
     chown -R "${WARPIE_USER}:kismet" "/home/${WARPIE_USER}/kismet"
     chmod 775 "/home/${WARPIE_USER}/kismet"
-    
+
+    # Check for BTLE (TI CC2540) capture support
+    local KISMET_CAP_BTLE="/usr/bin/kismet_cap_ti_cc_2540"
+    if [[ -f "$KISMET_CAP_BTLE" ]]; then
+        log_success "BTLE capture support available (TI CC2540)"
+        # Check if any CC2540 devices are connected
+        if "$KISMET_CAP_BTLE" --list 2>/dev/null | grep -q "ticc2540-"; then
+            log_success "BTLE adapter detected - can be enabled during adapter configuration"
+        else
+            log_info "No BTLE adapter currently connected (can be added later)"
+        fi
+    else
+        log_info "BTLE capture support not available (kismet_cap_ti_cc_2540 not found)"
+        log_info "To enable BTLE: ensure Kismet was compiled with libusb support"
+    fi
+
     log_success "Kismet permissions configured"
     log_info "Note: User may need to log out and back in for group changes to take effect"
 }
@@ -2275,6 +2290,7 @@ run_tests() {
     test_check "hostapd installed" "command -v hostapd"
     test_check "dnsmasq installed" "command -v dnsmasq"
     test_check "python3 installed" "command -v python3"
+    test_check "BTLE capture support (optional)" "command -v kismet_cap_ti_cc_2540" "false"
     
     echo ""
     echo "--- Security & Permissions ---"

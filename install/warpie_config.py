@@ -85,6 +85,54 @@ class AdapterConfig:
     channels_6: str = ""
 
 
+@dataclass
+class BTLEAdapter:
+    """Represents a detected BTLE adapter (TI CC2540)."""
+
+    device_id: str  # e.g., "ticc2540-1-5"
+    usb_path: str  # e.g., "1-5" (bus-device)
+
+
+def detect_btle_adapters() -> list[BTLEAdapter]:
+    """Detect TI CC2540 BTLE adapters using Kismet's capture helper.
+
+    Returns a list of detected BTLE adapters. Empty list if none found
+    or if kismet_cap_ti_cc_2540 is not installed.
+    """
+    adapters = []
+
+    try:
+        result = subprocess.run(
+            ["kismet_cap_ti_cc_2540", "--list"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        # Parse output like:
+        # ticc2540 supported data sources:
+        #     ticc2540-1-5 (ticc2540)
+        # Note: Output goes to stderr, not stdout
+        output = result.stderr if result.stderr else result.stdout
+        for line in output.splitlines():
+            line = line.strip()
+            # Look for lines like "ticc2540-1-5 (ticc2540)"
+            if line.startswith("ticc2540-") and "(ticc2540)" in line:
+                device_id = line.split()[0]  # e.g., "ticc2540-1-5"
+                # Extract USB path from device_id (e.g., "1-5" from "ticc2540-1-5")
+                usb_path = device_id.replace("ticc2540-", "")
+                adapters.append(BTLEAdapter(device_id=device_id, usb_path=usb_path))
+
+    except FileNotFoundError:
+        # kismet_cap_ti_cc_2540 not installed
+        pass
+    except Exception:
+        # Other errors - silently ignore
+        pass
+
+    return adapters
+
+
 def detect_wifi_interfaces() -> list[WifiAdapter]:
     """Detect all WiFi interfaces and their capabilities."""
     adapters = []
@@ -529,11 +577,68 @@ def configure_kismet_autostart() -> bool:
     return autostart
 
 
+def configure_btle(btle_adapters: list[BTLEAdapter]) -> dict[str, str] | None:
+    """Configure BTLE capture with TI CC2540 adapter.
+
+    Returns dict with 'enabled' and 'device' keys, or None if no adapters.
+    """
+    if not btle_adapters:
+        return None
+
+    console.print()
+    console.print(
+        Panel.fit(
+            "[bold white]Bluetooth LE Configuration (Optional)[/bold white]\n\n"
+            "A TI CC2540 BTLE adapter was detected!\n"
+            "[dim]→ Captures Bluetooth Low Energy advertisements[/dim]\n"
+            "[dim]→ Detects fitness trackers, beacons, smart devices[/dim]\n"
+            "[dim]→ Runs alongside WiFi capture[/dim]",
+            border_style="bright_magenta",
+        )
+    )
+
+    # Show detected adapters
+    console.print(f"\n[cyan]Detected BTLE adapter(s):[/cyan]")
+    for adapter in btle_adapters:
+        console.print(f"  [bright_magenta]■[/bright_magenta] {adapter.device_id} (USB: {adapter.usb_path})")
+
+    if not inquirer.confirm(
+        message="Enable BTLE capture?",
+        default=True,
+        instruction="Y/n | Press Enter for Yes",
+        qmark="",
+        amark="",
+    ).execute():
+        console.print("[yellow]⊘ BTLE capture disabled[/yellow]")
+        return {"enabled": "false", "device": ""}
+
+    # If multiple adapters, let user choose
+    if len(btle_adapters) > 1:
+        choices = [
+            {"name": f"{a.device_id} (USB: {a.usb_path})", "value": a}
+            for a in btle_adapters
+        ]
+        selected = inquirer.select(
+            message="Select BTLE adapter:",
+            choices=choices,
+            pointer=INDICATOR_POINTER,
+            qmark="",
+            amark="",
+        ).execute()
+    else:
+        selected = btle_adapters[0]
+
+    console.print(f"[green]✓ BTLE capture enabled: {selected.device_id}[/green]")
+
+    return {"enabled": "true", "device": selected.device_id}
+
+
 def save_config(
     ap: WifiAdapter,
     configs: list[AdapterConfig],
     home_wifi: dict[str, str] | None = None,
     kismet_autostart: bool = True,
+    btle_config: dict[str, str] | None = None,
     output_path: str = "/etc/warpie/adapters.conf",
 ) -> None:
     """Save configuration to file.
@@ -568,6 +673,26 @@ def save_config(
                 'HOME_WIFI_ENABLED="false"',
                 'HOME_WIFI_SSID=""',
                 'HOME_WIFI_PSK=""',
+            ]
+        )
+
+    # Add BTLE configuration
+    if btle_config:
+        lines.extend(
+            [
+                "",
+                "# BTLE Configuration (TI CC2540)",
+                f'BTLE_ENABLED="{btle_config["enabled"]}"',
+                f'BTLE_DEVICE="{btle_config["device"]}"',
+            ]
+        )
+    else:
+        lines.extend(
+            [
+                "",
+                "# BTLE Configuration (TI CC2540)",
+                'BTLE_ENABLED="false"',
+                'BTLE_DEVICE=""',
             ]
         )
 
@@ -612,7 +737,7 @@ def main():  # noqa: PLR0912, PLR0915
     console.print(
         "\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]"
     )
-    console.print("[bold cyan]  WiFi Adapter Configuration[/bold cyan]")
+    console.print("[bold cyan]  WarPie Adapter Configuration[/bold cyan]")
     console.print(
         "[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]"
     )
@@ -629,6 +754,14 @@ def main():  # noqa: PLR0912, PLR0915
         sys.exit(1)
 
     display_adapters(adapters)
+
+    # Detect BTLE adapters
+    console.print("[blue]Detecting BTLE adapters...[/blue]")
+    btle_adapters = detect_btle_adapters()
+    if btle_adapters:
+        console.print(f"[green]✓ Found {len(btle_adapters)} BTLE adapter(s)[/green]")
+    else:
+        console.print("[dim]  No BTLE adapters detected[/dim]")
 
     # Step 1: Select AP
     ap = select_ap_interface(adapters)
@@ -665,6 +798,9 @@ def main():  # noqa: PLR0912, PLR0915
 
     # Step 5: Kismet auto-start
     kismet_autostart = configure_kismet_autostart()
+
+    # Step 6: BTLE configuration (if adapters detected)
+    btle_config = configure_btle(btle_adapters)
 
     # Confirm
     console.print()
@@ -703,6 +839,15 @@ def main():  # noqa: PLR0912, PLR0915
             "[bold]Kismet Auto-Start[/bold]", "[yellow]Manual Start[/yellow] (From Web App)"
         )
 
+    # BTLE summary
+    if btle_config and btle_config.get("enabled") == "true":
+        summary_table.add_row(
+            "[bold]BTLE Capture[/bold]", f"[green]Enabled[/green] - {btle_config['device']}"
+        )
+    elif btle_adapters:
+        summary_table.add_row("[bold]BTLE Capture[/bold]", "[yellow]Disabled[/yellow]")
+    # Don't show BTLE row if no adapters were detected
+
     summary_table.add_row("", "")  # Spacer
 
     for i, cfg in enumerate(configs, 1):
@@ -725,7 +870,7 @@ def main():  # noqa: PLR0912, PLR0915
     if inquirer.confirm(
         message="Save this configuration?", default=True, instruction="Y/n"
     ).execute():
-        save_config(ap, configs, home_wifi, kismet_autostart)
+        save_config(ap, configs, home_wifi, kismet_autostart, btle_config)
         return 0
     else:
         console.print("[yellow]Configuration cancelled[/yellow]")

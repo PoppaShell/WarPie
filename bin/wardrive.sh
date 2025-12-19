@@ -93,6 +93,13 @@ build_capture_args() {
     echo "$args"
 }
 
+# Build BTLE capture arguments if enabled
+build_btle_args() {
+    if [[ "${BTLE_ENABLED:-false}" == "true" && -n "${BTLE_DEVICE}" ]]; then
+        echo "-c ${BTLE_DEVICE}"
+    fi
+}
+
 # Determine mode from environment or default
 MODE="${KISMET_MODE:-normal}"
 
@@ -128,6 +135,13 @@ log "Starting Kismet in $MODE mode..."
 
 # Build capture interface arguments with channel configuration
 CAPTURE_ARGS=$(build_capture_args)
+
+# Add BTLE capture if enabled
+BTLE_ARGS=$(build_btle_args)
+if [[ -n "$BTLE_ARGS" ]]; then
+    log "BTLE capture enabled: ${BTLE_DEVICE}"
+    CAPTURE_ARGS="${CAPTURE_ARGS} ${BTLE_ARGS}"
+fi
 
 log "Capture interfaces:${CAPTURE_ARGS}"
 
