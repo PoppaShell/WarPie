@@ -21,6 +21,11 @@ NC='\033[0m'
 # Current mode tracking
 CURRENT_MODE=""  # "client" or "ap"
 
+# Scan failure tracking - require multiple consecutive failures before switching
+# This prevents flip-flopping due to intermittent scan failures (common on Broadcom)
+SCAN_FAIL_COUNT=0
+SCAN_FAIL_THRESHOLD=3  # Require 3 consecutive failures before switching to AP
+
 # Logging function
 log() {
     local level="$1"
@@ -307,7 +312,9 @@ main() {
 
         # Check if home WiFi is in range
         if home_wifi_in_range; then
-            # Home WiFi available
+            # Home WiFi available - reset failure counter
+            SCAN_FAIL_COUNT=0
+
             if [[ "${CURRENT_MODE}" != "client" ]]; then
                 log INFO "Home WiFi available, switching from ${CURRENT_MODE:-none} to client mode"
                 if switch_to_client_mode; then
@@ -319,8 +326,24 @@ main() {
                 log INFO "Already in client mode, connection OK"
             fi
         else
-            # Home WiFi not available
-            if [[ "${CURRENT_MODE}" != "ap" ]]; then
+            # Home WiFi not detected in scan
+            ((SCAN_FAIL_COUNT++)) || true
+
+            if [[ "${CURRENT_MODE}" == "client" ]]; then
+                # Currently in client mode - be conservative about switching
+                if [[ ${SCAN_FAIL_COUNT} -ge ${SCAN_FAIL_THRESHOLD} ]]; then
+                    log INFO "Home WiFi not detected for ${SCAN_FAIL_COUNT} consecutive scans, switching to AP mode"
+                    if switch_to_ap_mode; then
+                        log SUCCESS "Successfully switched to AP mode"
+                        SCAN_FAIL_COUNT=0
+                    else
+                        log ERROR "Failed to switch to AP mode, will retry"
+                    fi
+                else
+                    log INFO "Home WiFi not in scan (${SCAN_FAIL_COUNT}/${SCAN_FAIL_THRESHOLD}), staying in client mode"
+                fi
+            elif [[ "${CURRENT_MODE}" != "ap" ]]; then
+                # Not in any mode yet - switch to AP immediately
                 log INFO "Home WiFi unavailable, switching from ${CURRENT_MODE:-none} to AP mode"
                 if switch_to_ap_mode; then
                     log SUCCESS "Successfully switched to AP mode"
