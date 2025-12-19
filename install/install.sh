@@ -253,18 +253,16 @@ configure_adapters_interactive() {
         pip3 install inquirerpy rich --quiet 2>/dev/null || true
     fi
 
-    # Download warpie_config.py if not present (for standalone installs)
+    # Download warpie_config.py (always download to ensure correct version)
     local config_script="${SCRIPT_DIR}/warpie_config.py"
-    if [[ ! -f "${config_script}" ]]; then
-        log_info "Downloading warpie_config.py..."
-        local branch="${WARPIE_BRANCH:-main}"
-        local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/install/warpie_config.py"
-        if ! curl -sSL "${url}" -o "${config_script}"; then
-            log_error "Failed to download warpie_config.py"
-            exit 1
-        fi
-        chmod +x "${config_script}"
+    local branch="${WARPIE_BRANCH:-main}"
+    log_info "Downloading warpie_config.py from ${branch} branch..."
+    local url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}/install/warpie_config.py"
+    if ! curl -sSL "${url}" -o "${config_script}"; then
+        log_error "Failed to download warpie_config.py"
+        exit 1
     fi
+    chmod +x "${config_script}"
 
     # Run Python configuration tool
     log_info "Launching interactive adapter configuration..."
