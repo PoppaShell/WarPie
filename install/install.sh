@@ -796,7 +796,8 @@ configure_kismet_permissions() {
     if [[ -f "$KISMET_CAP_BTLE" ]]; then
         log_success "BTLE capture support available (TI CC2540)"
         # Check if any CC2540 devices are connected
-        if "$KISMET_CAP_BTLE" --list 2>/dev/null | grep -q "ticc2540-"; then
+        # Note: kismet_cap_ti_cc_2540 outputs to stderr, not stdout
+        if "$KISMET_CAP_BTLE" --list 2>&1 | grep -q "ticc2540-"; then
             log_success "BTLE adapter detected - can be enabled during adapter configuration"
         else
             log_info "No BTLE adapter currently connected (can be added later)"
