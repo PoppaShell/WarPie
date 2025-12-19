@@ -92,11 +92,13 @@ home_wifi_in_range() {
         sleep 2
     fi
 
-    # Scan for networks (use || true to prevent pipefail crash)
+    # Scan for networks
     log INFO "Scanning for home WiFi: ${ssid}"
     local scan_result
     scan_result=$(iw dev "${iface}" scan 2>/dev/null || true)
-    if echo "${scan_result}" | grep -q "SSID: ${ssid}"; then
+
+    # Use [[ ]] pattern match instead of grep to avoid broken pipe issues
+    if [[ "${scan_result}" == *"SSID: ${ssid}"* ]]; then
         log INFO "Home WiFi detected: ${ssid}"
         return 0
     else
@@ -238,10 +240,10 @@ detect_current_mode() {
     # Check if wpa_supplicant is running for this interface
     if pgrep -f "wpa_supplicant" >/dev/null 2>&1; then
         # wpa_supplicant is running, but we may not have an IP yet
-        # Check if interface is associated (use || true to avoid pipefail crash)
+        # Check if interface is associated
         local link_status
         link_status=$(iw dev "${WIFI_AP}" link 2>/dev/null || true)
-        if echo "${link_status}" | grep -q "Connected"; then
+        if [[ "${link_status}" == *"Connected"* ]]; then
             CURRENT_MODE="client"
             return
         fi
