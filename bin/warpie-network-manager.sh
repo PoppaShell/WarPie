@@ -86,15 +86,17 @@ home_wifi_in_range() {
     local iface="${WIFI_AP}"
 
     # Bring interface up if needed
-    if ! ip link show "${iface}" | grep -q "state UP"; then
+    if ! ip link show "${iface}" 2>/dev/null | grep -q "state UP"; then
         log INFO "Bringing ${iface} up for scanning"
         ip link set "${iface}" up 2>/dev/null || true
         sleep 2
     fi
 
-    # Scan for networks
+    # Scan for networks (use || true to prevent pipefail crash)
     log INFO "Scanning for home WiFi: ${ssid}"
-    if iw dev "${iface}" scan 2>/dev/null | grep -q "SSID: ${ssid}"; then
+    local scan_result
+    scan_result=$(iw dev "${iface}" scan 2>/dev/null || true)
+    if echo "${scan_result}" | grep -q "SSID: ${ssid}"; then
         log INFO "Home WiFi detected: ${ssid}"
         return 0
     else
@@ -155,8 +157,9 @@ EOF
     sleep 5
 
     # Check if we got an IP (exclude 10.0.0.x which is the AP range)
-    local ip_address
-    ip_address=$(ip addr show "${WIFI_AP}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | cut -d'/' -f1 | head -1)
+    local ip_output ip_address
+    ip_output=$(ip addr show "${WIFI_AP}" 2>/dev/null || true)
+    ip_address=$(echo "${ip_output}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | cut -d'/' -f1 | head -1 || true)
     if [[ -n "${ip_address}" ]]; then
         log SUCCESS "Connected to home WiFi: ${HOME_WIFI_SSID} (IP: ${ip_address})"
         CURRENT_MODE="client"
@@ -223,8 +226,10 @@ detect_current_mode() {
 
     # Check if we have a non-AP IP address on the interface (client mode)
     # This is more reliable than checking for wpa_supplicant process
-    local client_ip
-    client_ip=$(ip addr show "${WIFI_AP}" 2>/dev/null | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | head -1)
+    # Use intermediate variable to avoid pipefail issues
+    local ip_output client_ip
+    ip_output=$(ip addr show "${WIFI_AP}" 2>/dev/null || true)
+    client_ip=$(echo "${ip_output}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | head -1 || true)
     if [[ -n "${client_ip}" ]]; then
         CURRENT_MODE="client"
         return
@@ -233,8 +238,10 @@ detect_current_mode() {
     # Check if wpa_supplicant is running for this interface
     if pgrep -f "wpa_supplicant" >/dev/null 2>&1; then
         # wpa_supplicant is running, but we may not have an IP yet
-        # Check if interface is associated
-        if iw dev "${WIFI_AP}" link 2>/dev/null | grep -q "Connected"; then
+        # Check if interface is associated (use || true to avoid pipefail crash)
+        local link_status
+        link_status=$(iw dev "${WIFI_AP}" link 2>/dev/null || true)
+        if echo "${link_status}" | grep -q "Connected"; then
             CURRENT_MODE="client"
             return
         fi
