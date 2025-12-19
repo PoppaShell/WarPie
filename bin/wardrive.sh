@@ -94,8 +94,20 @@ build_capture_args() {
 }
 
 # Build BTLE capture arguments if enabled
+# Detects device at runtime since USB paths can change between reboots
 build_btle_args() {
-    if [[ "${BTLE_ENABLED:-false}" == "true" && -n "${BTLE_DEVICE}" ]]; then
+    if [[ "${BTLE_ENABLED:-false}" != "true" ]]; then
+        return
+    fi
+
+    # Detect current BTLE device (USB path may have changed since config)
+    local detected_device
+    detected_device=$(kismet_cap_ti_cc_2540 --list 2>&1 | grep -oP 'ticc2540-\d+-\d+' | head -1)
+
+    if [[ -n "$detected_device" ]]; then
+        echo "-c ${detected_device}"
+    elif [[ -n "${BTLE_DEVICE}" ]]; then
+        # Fallback to configured device if detection fails
         echo "-c ${BTLE_DEVICE}"
     fi
 }
@@ -136,10 +148,10 @@ log "Starting Kismet in $MODE mode..."
 # Build capture interface arguments with channel configuration
 CAPTURE_ARGS=$(build_capture_args)
 
-# Add BTLE capture if enabled
+# Add BTLE capture if enabled (detects device at runtime)
 BTLE_ARGS=$(build_btle_args)
 if [[ -n "$BTLE_ARGS" ]]; then
-    log "BTLE capture enabled: ${BTLE_DEVICE}"
+    log "BTLE capture enabled: ${BTLE_ARGS#-c }"
     CAPTURE_ARGS="${CAPTURE_ARGS} ${BTLE_ARGS}"
 fi
 
