@@ -54,6 +54,61 @@ log() {
     esac
 }
 
+# Wait for a condition with timeout and retries
+# Usage: wait_for_condition "description" "check_command" max_attempts delay_seconds
+wait_for_condition() {
+    local description="$1"
+    local check_cmd="$2"
+    local max_attempts="${3:-10}"
+    local delay="${4:-1}"
+    local attempt=1
+
+    while [[ ${attempt} -le ${max_attempts} ]]; do
+        if eval "${check_cmd}"; then
+            return 0
+        fi
+        log INFO "Waiting for ${description}... (${attempt}/${max_attempts})"
+        sleep "${delay}"
+        ((attempt++))
+    done
+
+    log ERROR "Timeout waiting for ${description}"
+    return 1
+}
+
+# Start a service with retry logic
+# Usage: start_service_with_retry "service_name" max_attempts
+start_service_with_retry() {
+    local service="$1"
+    local max_attempts="${2:-3}"
+    local attempt=1
+
+    while [[ ${attempt} -le ${max_attempts} ]]; do
+        log INFO "Starting ${service}... (attempt ${attempt}/${max_attempts})"
+
+        # Stop first to ensure clean state
+        systemctl stop "${service}" 2>/dev/null || true
+        sleep 1
+
+        # Start the service
+        if systemctl start "${service}"; then
+            # Verify it's actually running
+            sleep 1
+            if systemctl is-active --quiet "${service}"; then
+                log SUCCESS "${service} started successfully"
+                return 0
+            fi
+        fi
+
+        log WARN "${service} failed to start, retrying..."
+        ((attempt++))
+        sleep 2
+    done
+
+    log ERROR "Failed to start ${service} after ${max_attempts} attempts"
+    return 1
+}
+
 # Load configuration
 load_config() {
     if [[ ! -f "${ADAPTERS_CONF}" ]]; then
@@ -187,38 +242,87 @@ EOF
 switch_to_ap_mode() {
     log INFO "Switching to AP mode..."
 
-    # Kill wpa_supplicant if running
+    # =========================================================================
+    # STEP 1: Stop all conflicting services (clean slate)
+    # =========================================================================
+    log INFO "Stopping conflicting services..."
+
+    # Stop wpa_supplicant
     if [[ -f /var/run/wpa_supplicant.pid ]]; then
-        log INFO "Stopping wpa_supplicant..."
         kill "$(cat /var/run/wpa_supplicant.pid)" 2>/dev/null || true
         rm -f /var/run/wpa_supplicant.pid
     fi
-    # Also kill any wpa_supplicant processes we didn't start
     pkill -f "wpa_supplicant.*${WIFI_AP}" 2>/dev/null || true
 
-    # Release DHCP lease using dhcpcd
-    log INFO "Releasing DHCP lease..."
+    # Release DHCP lease
     dhcpcd -k "${WIFI_AP}" 2>/dev/null || true
 
-    # Configure static IP for AP
+    # Stop hostapd and dnsmasq if running (ensures clean slate)
+    systemctl stop dnsmasq 2>/dev/null || true
+    systemctl stop hostapd 2>/dev/null || true
+
+    # Wait for services to fully stop
+    wait_for_condition "hostapd to stop" \
+        "! systemctl is-active --quiet hostapd" 5 1 || true
+    wait_for_condition "dnsmasq to stop" \
+        "! systemctl is-active --quiet dnsmasq" 5 1 || true
+
+    # =========================================================================
+    # STEP 2: Configure interface with static IP
+    # =========================================================================
     log INFO "Configuring static IP for AP..."
+
+    # Flush and bring interface down for clean state
     ip addr flush dev "${WIFI_AP}" 2>/dev/null || true
-    ip addr add 10.0.0.1/24 dev "${WIFI_AP}" 2>/dev/null || {
-        log WARN "Failed to set static IP (may already be set)"
-    }
+    ip link set "${WIFI_AP}" down 2>/dev/null || true
+    sleep 1
+
+    # Bring interface up and assign IP
     ip link set "${WIFI_AP}" up
+    ip addr add 10.0.0.1/24 dev "${WIFI_AP}" 2>/dev/null || {
+        # Check if already set (not an error)
+        if ! ip addr show "${WIFI_AP}" 2>/dev/null | grep -q "10.0.0.1"; then
+            log ERROR "Failed to set static IP on ${WIFI_AP}"
+            return 1
+        fi
+    }
 
-    # Start dnsmasq
-    log INFO "Starting dnsmasq..."
-    systemctl start dnsmasq || log WARN "Failed to start dnsmasq"
+    # VERIFY: Wait for IP to be visible on interface
+    if ! wait_for_condition "IP address 10.0.0.1 on ${WIFI_AP}" \
+        "ip addr show ${WIFI_AP} 2>/dev/null | grep -q '10.0.0.1'" 5 1; then
+        log ERROR "Static IP not applied to ${WIFI_AP}"
+        return 1
+    fi
+    log SUCCESS "Static IP 10.0.0.1 configured on ${WIFI_AP}"
 
-    # Start hostapd
-    log INFO "Starting hostapd..."
-    systemctl start hostapd || log WARN "Failed to start hostapd"
+    # =========================================================================
+    # STEP 3: Start hostapd (puts interface in AP mode)
+    # =========================================================================
+    if ! start_service_with_retry "hostapd" 3; then
+        log ERROR "hostapd failed to start after retries"
+        return 1
+    fi
 
-    sleep 3
+    # VERIFY: Interface is in AP mode
+    if ! wait_for_condition "interface in AP mode" \
+        "iw dev ${WIFI_AP} info 2>/dev/null | grep -q 'type AP'" 5 1; then
+        log ERROR "${WIFI_AP} not in AP mode after hostapd start"
+        systemctl stop hostapd 2>/dev/null || true
+        return 1
+    fi
+    log SUCCESS "${WIFI_AP} is now in AP mode"
 
-    # Verify AP is running
+    # =========================================================================
+    # STEP 4: Start dnsmasq (DHCP server for clients)
+    # =========================================================================
+    if ! start_service_with_retry "dnsmasq" 3; then
+        log WARN "dnsmasq failed to start - AP will work but clients won't get DHCP"
+        # Don't fail completely - AP can still work with manual IP config
+    fi
+
+    # =========================================================================
+    # FINAL VERIFICATION
+    # =========================================================================
     if systemctl is-active --quiet hostapd; then
         log SUCCESS "WarPie AP started successfully"
         CURRENT_MODE="ap"

@@ -1577,6 +1577,16 @@ log-dhcp
 DNSMASQ_EOF
     log_success "dnsmasq AP configuration created"
 
+    # Configure NetworkManager to ignore wlan0 (AP interface)
+    # This prevents conflicts between NetworkManager and our network manager
+    log_info "Configuring NetworkManager to ignore AP interface..."
+    mkdir -p /etc/NetworkManager/conf.d
+    cat > /etc/NetworkManager/conf.d/99-warpie-unmanaged.conf << NMCONF_EOF
+[keyfile]
+unmanaged-devices=interface-name:${ap_interface}
+NMCONF_EOF
+    log_success "NetworkManager configured to ignore ${ap_interface}"
+
     # Download or copy systemd service
     local service_file="${SCRIPT_DIR}/../systemd/warpie-network.service"
     if [[ ! -f "${service_file}" ]]; then
@@ -2475,11 +2485,13 @@ uninstall() {
     # Restore NetworkManager control of WiFi interfaces
     # -------------------------------------------------------------------------
     log_info "Restoring NetworkManager control of WiFi interfaces..."
+    rm -f /etc/NetworkManager/conf.d/99-warpie-unmanaged.conf
     for iface in /sys/class/net/wlan*; do
         if [[ -e "${iface}" ]]; then
             nmcli device set "$(basename "${iface}")" managed yes 2>/dev/null || true
         fi
     done
+    systemctl restart NetworkManager 2>/dev/null || true
 
     # -------------------------------------------------------------------------
     # Restore default gpsd service
