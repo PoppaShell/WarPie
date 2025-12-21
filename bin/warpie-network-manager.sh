@@ -183,11 +183,14 @@ switch_to_client_mode() {
         systemctl stop dnsmasq || log WARN "Failed to stop dnsmasq"
     fi
 
+    # Wait for services to stop
+    wait_for_condition "hostapd to stop" "! systemctl is-active --quiet hostapd" 5 1 || true
+    wait_for_condition "dnsmasq to stop" "! systemctl is-active --quiet dnsmasq" 5 1 || true
+
     # Kill any existing wpa_supplicant on this interface (including NetworkManager's)
     log INFO "Stopping any existing wpa_supplicant..."
     pkill -f "wpa_supplicant.*${WIFI_AP}" 2>/dev/null || true
     rm -f "/var/run/wpa_supplicant/${WIFI_AP}" 2>/dev/null || true
-    sleep 1
 
     # Flush any existing IP addresses (removes AP mode static IP)
     log INFO "Flushing existing IP addresses..."
@@ -215,27 +218,33 @@ EOF
         log WARN "wpa_supplicant already running or failed to start"
     }
 
-    # Request DHCP address using dhcpcd (standard on Raspberry Pi OS)
+    # Wait for wpa_supplicant to associate with AP
+    if ! wait_for_condition "wpa_supplicant to associate with ${HOME_WIFI_SSID}" \
+        "iw dev ${WIFI_AP} link 2>/dev/null | grep -q 'Connected'" 15 1; then
+        log ERROR "wpa_supplicant failed to associate with ${HOME_WIFI_SSID}"
+        return 1
+    fi
+    log SUCCESS "Associated with ${HOME_WIFI_SSID}"
+
+    # Request DHCP address (run in background so we can poll for IP)
     log INFO "Requesting DHCP address via dhcpcd..."
-    dhcpcd -n "${WIFI_AP}" 2>&1 | while read -r line; do
-        log INFO "DHCP: ${line}"
-    done
+    dhcpcd -n "${WIFI_AP}" 2>/dev/null &
 
-    # Wait for connection
-    sleep 5
+    # Wait for IP address (exclude AP range 10.0.0.x)
+    if ! wait_for_condition "DHCP IP address on ${WIFI_AP}" \
+        "ip addr show ${WIFI_AP} 2>/dev/null | grep 'inet ' | grep -v '10.0.0.' | grep -q 'inet '" 20 1; then
+        log ERROR "Failed to get DHCP IP address"
+        return 1
+    fi
 
-    # Check if we got an IP (exclude 10.0.0.x which is the AP range)
+    # Get and log the IP
     local ip_output ip_address
     ip_output=$(ip addr show "${WIFI_AP}" 2>/dev/null || true)
     ip_address=$(echo "${ip_output}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | cut -d'/' -f1 | head -1 || true)
-    if [[ -n "${ip_address}" ]]; then
-        log SUCCESS "Connected to home WiFi: ${HOME_WIFI_SSID} (IP: ${ip_address})"
-        CURRENT_MODE="client"
-        return 0
-    else
-        log ERROR "Failed to get IP address from home WiFi"
-        return 1
-    fi
+
+    log SUCCESS "Connected to home WiFi: ${HOME_WIFI_SSID} (IP: ${ip_address})"
+    CURRENT_MODE="client"
+    return 0
 }
 
 # Switch to AP mode (start WarPie access point)
