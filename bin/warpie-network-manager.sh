@@ -230,9 +230,9 @@ EOF
     log INFO "Requesting DHCP address via dhcpcd..."
     dhcpcd -n "${WIFI_AP}" 2>/dev/null &
 
-    # Wait for IP address (exclude AP range 10.0.0.x)
+    # Wait for IP address (exclude only the AP static IP 10.0.0.1, not the whole range)
     if ! wait_for_condition "DHCP IP address on ${WIFI_AP}" \
-        "ip addr show ${WIFI_AP} 2>/dev/null | grep 'inet ' | grep -v '10.0.0.' | grep -q 'inet '" 20 1; then
+        "ip addr show ${WIFI_AP} 2>/dev/null | grep 'inet ' | grep -v 'inet 10.0.0.1/' | grep -q 'inet '" 20 1; then
         log ERROR "Failed to get DHCP IP address"
         return 1
     fi
@@ -240,7 +240,7 @@ EOF
     # Get and log the IP
     local ip_output ip_address
     ip_output=$(ip addr show "${WIFI_AP}" 2>/dev/null || true)
-    ip_address=$(echo "${ip_output}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | cut -d'/' -f1 | head -1 || true)
+    ip_address=$(echo "${ip_output}" | grep "inet " | grep -v "inet 10.0.0.1/" | awk '{print $2}' | cut -d'/' -f1 | head -1 || true)
 
     log SUCCESS "Connected to home WiFi: ${HOME_WIFI_SSID} (IP: ${ip_address})"
     CURRENT_MODE="client"
@@ -351,11 +351,11 @@ detect_current_mode() {
     fi
 
     # Check if we have a non-AP IP address on the interface (client mode)
-    # This is more reliable than checking for wpa_supplicant process
+    # Only exclude the AP static IP (10.0.0.1), not the whole 10.0.0.x range
     # Use intermediate variable to avoid pipefail issues
     local ip_output client_ip
     ip_output=$(ip addr show "${WIFI_AP}" 2>/dev/null || true)
-    client_ip=$(echo "${ip_output}" | grep "inet " | grep -v "10.0.0." | awk '{print $2}' | head -1 || true)
+    client_ip=$(echo "${ip_output}" | grep "inet " | grep -v "inet 10.0.0.1/" | awk '{print $2}' | head -1 || true)
     if [[ -n "${client_ip}" ]]; then
         CURRENT_MODE="client"
         return
