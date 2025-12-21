@@ -30,6 +30,17 @@ CYAN='\033[0;36m'
 BOLD='\033[1m'
 NC='\033[0m' # No Color
 
+# Branch configuration for downloading scripts
+# Priority: 1) Environment variable, 2) Git branch if in repo, 3) Default to main
+if [[ -z "${WARPIE_BRANCH:-}" ]]; then
+    # Try to detect from git if we're in a repo
+    if git rev-parse --git-dir &>/dev/null; then
+        WARPIE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    else
+        WARPIE_BRANCH="main"
+    fi
+fi
+
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WARPIE_USER="${SUDO_USER:-pi}"
