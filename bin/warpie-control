@@ -13,10 +13,17 @@ import argparse
 import sys
 from pathlib import Path
 
-# Add web package to path if running from source
+# Add web package to path
+# Priority: 1) Source tree (development), 2) Installed location
 src_dir = Path(__file__).parent.parent
+install_dir = Path("/usr/local/share/warpie")
+
 if (src_dir / "web").exists():
+    # Running from source tree
     sys.path.insert(0, str(src_dir))
+elif install_dir.exists():
+    # Running from installed location
+    sys.path.insert(0, str(install_dir))
 
 
 def main() -> None:
