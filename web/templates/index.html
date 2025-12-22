@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}WarPie Control Panel{% endblock %}
+
+{% block content %}
+<header class="header">
+    <h1 class="logo">WARPIE</h1>
+    <span class="subtitle">Control Panel</span>
+</header>
+
+<!-- Status Panel -->
+<section class="panel" id="status-panel"
+         hx-get="/api/status/html"
+         hx-trigger="every 3s"
+         hx-swap="innerHTML">
+    {% include "partials/_status.html" %}
+</section>
+
+<!-- Mode Selection -->
+<section class="panel">
+    <h2 class="panel-title">Mode Select</h2>
+    <div class="mode-buttons" id="mode-buttons">
+        {% include "partials/_mode_buttons.html" %}
+    </div>
+
+    <!-- Target List Picker (shown when Targeted mode selected) -->
+    <div id="target-picker" class="target-picker hidden">
+        {% include "partials/_target_picker.html" %}
+    </div>
+</section>
+
+<!-- Controls -->
+<section class="panel">
+    <h2 class="panel-title">Controls</h2>
+    {% include "partials/_controls.html" %}
+</section>
+
+<!-- Navigation Links -->
+<nav class="nav-links">
+    <button class="nav-btn" onclick="openFilters()">
+        <span class="icon">&#9881;</span> Network Filters
+    </button>
+    <button class="nav-btn" onclick="openLogs()">
+        <span class="icon">&#128196;</span> Logs
+    </button>
+    <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">
+        <span class="icon">&#8599;</span> Kismet UI
+    </a>
+</nav>
+
+<!-- Flyout Overlay -->
+<div class="flyout-overlay" id="flyout-overlay" onclick="closeAllFlyouts()"></div>
+
+<!-- Log Viewer Flyout -->
+<div class="flyout" id="log-flyout">
+    {% include "partials/_flyout_logs.html" %}
+</div>
+
+<!-- Network Filters Flyout -->
+<div class="flyout" id="filters-flyout">
+    {% include "partials/_flyout_filters.html" %}
+</div>
+
+<!-- Target List Editor Flyout -->
+<div class="flyout sub-flyout" id="target-editor-flyout">
+    {% include "partials/_target_list_editor.html" %}
+</div>
+{% endblock %}

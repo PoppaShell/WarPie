@@ -1615,13 +1615,76 @@ NMCONF_EOF
 }
 
 # =============================================================================
-# CONFIGURE CONTROL PANEL
+# CONFIGURE CONTROL PANEL (Flask + HTMX)
 # =============================================================================
 configure_control_panel() {
-    log_info "Installing control panel..."
-    
-    # NOTE: CSS curly braces are doubled ({{ }}) to escape Python's .format()
-    cat > /usr/local/bin/warpie-control.py << 'CONTROL_EOF'
+    log_info "Installing Flask-based control panel..."
+
+    # Install Python web dependencies
+    log_info "Installing Flask and Waitress..."
+    if ! pip3 install flask waitress --quiet --break-system-packages 2>/dev/null; then
+        pip3 install flask waitress --quiet 2>/dev/null || {
+            log_warn "Failed to install Flask/Waitress via pip"
+        }
+    fi
+
+    # Create installation directory
+    mkdir -p /usr/local/share/warpie
+
+    # Copy web package from source
+    if [[ -d "${SCRIPT_DIR}/../web" ]]; then
+        log_info "Copying web package..."
+        cp -r "${SCRIPT_DIR}/../web" /usr/local/share/warpie/
+    else
+        log_error "Web package not found at ${SCRIPT_DIR}/../web"
+        return 1
+    fi
+
+    # Copy entry point script
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-control" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-control" /usr/local/bin/warpie-control
+        chmod +x /usr/local/bin/warpie-control
+    else
+        log_error "Entry point not found at ${SCRIPT_DIR}/../bin/warpie-control"
+        return 1
+    fi
+
+    # Create target lists directory
+    mkdir -p /etc/warpie
+
+    # Install systemd service
+    if [[ -f "${SCRIPT_DIR}/../systemd/warpie-control.service" ]]; then
+        cp "${SCRIPT_DIR}/../systemd/warpie-control.service" /etc/systemd/system/
+    else
+        cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
+[Unit]
+Description=WarPie Control Panel
+Documentation=https://github.com/warpie/warpie
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/usr/local/share/warpie
+ExecStart=/usr/bin/python3 /usr/local/bin/warpie-control
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+    fi
+
+    log_success "Control panel installed (Flask + HTMX)"
+}
+
+# Legacy embedded script removed - now uses Flask application in web/ directory
+_REMOVED_LEGACY_CONTROL_PANEL() {
+    # This function documents that the old embedded control panel has been
+    # replaced with the Flask-based implementation in web/
+    # Old code: ~500 lines of embedded Python with http.server
+    # New code: Flask + Waitress + HTMX in web/ directory
+    cat << 'CONTROL_EOF'
 #!/usr/bin/env python3
 """
 WarPie Control Panel - Kismet Mode Switcher
@@ -2115,25 +2178,7 @@ def main():
 if __name__ == '__main__':
     main()
 CONTROL_EOF
-
-    chmod +x /usr/local/bin/warpie-control.py
-    
-    cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
-[Unit]
-Description=WarPie Control Panel
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/warpie-control.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE_EOF
-
-    log_success "Control panel installed"
+    : # This function is never called - just preserves old code for reference
 }
 
 # =============================================================================
@@ -2324,7 +2369,8 @@ run_tests() {
     echo "--- Scripts ---"
     test_check "network-manager.sh exists" "[[ -x /usr/local/bin/network-manager.sh ]]"
     test_check "wardrive.sh exists" "[[ -x /usr/local/bin/wardrive.sh ]]"
-    test_check "warpie-control.py exists" "[[ -x /usr/local/bin/warpie-control.py ]]"
+    test_check "warpie-control exists" "[[ -x /usr/local/bin/warpie-control ]]"
+    test_check "web package exists" "[[ -d /usr/local/share/warpie/web ]]"
     test_check "warpie-recovery.sh exists" "[[ -x /usr/local/bin/warpie-recovery.sh ]]"
     
     echo ""
@@ -2452,6 +2498,8 @@ uninstall() {
     rm -f /usr/local/bin/network-manager.sh
     rm -f /usr/local/bin/wardrive.sh
     rm -f /usr/local/bin/warpie-control.py
+    rm -f /usr/local/bin/warpie-control
+    rm -rf /usr/local/share/warpie
     rm -f /usr/local/bin/warpie-recovery.sh
     rm -f /usr/local/bin/warpie-network-manager.sh
     rm -f /usr/local/bin/warpie-exclude-ssid.sh

@@ -1,0 +1,76 @@
+#!/usr/bin/env python3
+"""WarPie Control Panel - Entry Point.
+
+Starts the Flask web application with Waitress WSGI server.
+Designed for Raspberry Pi deployment with low memory footprint.
+
+Usage:
+    warpie-control              # Run on default port 1337
+    warpie-control --port 8080  # Run on custom port
+"""
+
+import argparse
+import sys
+from pathlib import Path
+
+# Add web package to path if running from source
+src_dir = Path(__file__).parent.parent
+if (src_dir / "web").exists():
+    sys.path.insert(0, str(src_dir))
+
+
+def main() -> None:
+    """Start the WarPie control panel server."""
+    parser = argparse.ArgumentParser(
+        description="WarPie Control Panel - Web interface for Kismet wardriving"
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=1337,
+        help="Port to run the server on (default: 1337)",
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=2,
+        help="Number of worker threads (default: 2)",
+    )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Run in debug mode with Flask development server",
+    )
+    args = parser.parse_args()
+
+    # Import here to avoid issues if waitress not installed
+    from web.app import create_app
+
+    app = create_app()
+
+    print("WarPie Control Panel v3.0.0")
+    print(f"Running on http://{args.host}:{args.port}")
+
+    if args.debug:
+        # Use Flask dev server for debugging
+        app.run(host=args.host, port=args.port, debug=True)
+    else:
+        # Use Waitress for production
+        try:
+            from waitress import serve
+
+            serve(app, host=args.host, port=args.port, threads=args.threads)
+        except ImportError:
+            print("Warning: Waitress not installed, using Flask dev server")
+            print("Install with: pip install waitress")
+            app.run(host=args.host, port=args.port, debug=False)
+
+
+if __name__ == "__main__":
+    main()

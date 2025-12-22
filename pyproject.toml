@@ -22,6 +22,10 @@ classifiers = [
     "Topic :: Security",
     "Topic :: System :: Networking :: Monitoring",
 ]
+dependencies = [
+    "flask>=3.0",
+    "waitress>=3.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/warpie/warpie"
@@ -76,15 +80,10 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ARG", "PLR2004"]
 "bin/*" = ["S603", "S607"]
-# warpie-control.py has embedded HTML templates and intentional exception handling patterns
-# E501/W291/W293: HTML templates have long lines and formatting
-# S104: Binding to all interfaces is expected for a network-accessible web server
-# E722: Bare except is intentional for graceful web server error handling
-# PTH*: pathlib suggestions - defer to future refactor
-# PLR0911: Too many returns - acceptable for get_logs method
-# ERA001: False positives on API comment headers
-# RUF005: List concatenation style - acceptable
-"bin/warpie-control.py" = ["E501", "W291", "W293", "S104", "E722", "PTH103", "PTH119", "PTH123", "PTH207", "PLR0911", "ERA001", "RUF005"]
+# bin/warpie-control - entry point with deferred imports and all-interface binding
+"bin/warpie-control" = ["S104", "PLC0415"]
+# web/ package - Flask routes need subprocess calls and bind to all interfaces
+"web/*" = ["S104", "S603", "S607"]
 # warpie-filter-processor.py processes files and uses os.path extensively
 # PTH*: pathlib conversion deferred - os.path is more familiar for sysadmin scripts
 # PLR0912/PLR0915: Complex functions acceptable for CLI main() and workflow functions

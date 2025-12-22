@@ -1,0 +1,21 @@
+<h2 class="panel-title">Status</h2>
+<div class="status-grid">
+    <div class="status-item">
+        <span class="status-label">Mode</span>
+        <span class="status-value mode-{{ current_mode|lower }}">{{ current_mode }}</span>
+    </div>
+    <div class="status-item">
+        <span class="status-label">Uptime</span>
+        <span class="status-value">{{ uptime }}</span>
+    </div>
+</div>
+<div class="status-row">
+    <div class="status-indicator {{ status_class }}">
+        <span class="indicator-dot"></span>
+        <span>Kismet: {{ status }}</span>
+    </div>
+    <div class="status-indicator">
+        <span class="gps-icon">&#128225;</span>
+        <span>GPS: {{ gps_status }}</span>
+    </div>
+</div>

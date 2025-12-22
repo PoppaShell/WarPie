@@ -1,0 +1,25 @@
+<div class="control-buttons">
+    <button class="btn btn-danger btn-large"
+            hx-post="/api/mode"
+            hx-vals='{"mode": "stop"}'
+            hx-target="#status-panel"
+            hx-swap="innerHTML"
+            hx-indicator="#stop-spinner">
+        <span class="htmx-indicator" id="stop-spinner">
+            <span class="spinner"></span>
+        </span>
+        <span class="btn-icon">&#9209;</span>
+        Stop Kismet
+    </button>
+
+    <button class="btn btn-shutdown"
+            hx-post="/api/shutdown"
+            hx-confirm="Shutdown WarPie? The Raspberry Pi will power off and you will lose connection."
+            hx-indicator="#shutdown-spinner">
+        <span class="htmx-indicator" id="shutdown-spinner">
+            <span class="spinner"></span>
+        </span>
+        <span class="btn-icon">&#9211;</span>
+        Shutdown WarPie
+    </button>
+</div>

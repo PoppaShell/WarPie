@@ -1,0 +1,19 @@
+[Unit]
+Description=WarPie Control Panel
+Documentation=https://github.com/warpie/warpie
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/usr/local/share/warpie
+ExecStart=/usr/bin/python3 /usr/local/bin/warpie-control
+Restart=always
+RestartSec=5
+# Security hardening (limited because we need system access)
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

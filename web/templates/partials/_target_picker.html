@@ -1,0 +1,28 @@
+<div class="target-picker-header">
+    <h3>Select Target Lists</h3>
+    <p class="hint">Select one or more lists to capture</p>
+</div>
+
+<div class="target-list-checkboxes" id="target-list-checkboxes"
+     hx-get="/api/targets/lists"
+     hx-trigger="load"
+     hx-swap="innerHTML">
+    <div class="loading">
+        <span class="spinner"></span>
+        Loading target lists...
+    </div>
+</div>
+
+<button class="btn btn-primary btn-block" id="start-targeted-btn"
+        hx-post="/api/mode"
+        hx-include="[name='target_list']"
+        hx-vals='{"mode": "targeted"}'
+        hx-target="#status-panel"
+        hx-swap="innerHTML"
+        hx-indicator="#targeted-spinner"
+        onclick="collectSelectedLists(this)">
+    <span class="htmx-indicator" id="targeted-spinner">
+        <span class="spinner"></span>
+    </span>
+    Start Targeted Capture
+</button>
