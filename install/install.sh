@@ -32,14 +32,27 @@ NC='\033[0m' # No Color
 
 # Branch configuration for downloading scripts
 # Priority: 1) Environment variable, 2) Git branch if in repo, 3) Default to main
+#
+# IMPORTANT: To install from a specific branch, use one of these methods:
+#   sudo WARPIE_BRANCH=webapp-rebuild bash install.sh
+#   WARPIE_BRANCH=webapp-rebuild sudo -E bash install.sh
+#
 if [[ -z "${WARPIE_BRANCH:-}" ]]; then
-    # Try to detect from git if we're in a repo
-    if git rev-parse --git-dir &>/dev/null; then
-        WARPIE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    # Get the directory where this script is located
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    _REPO_DIR="$(dirname "${_SCRIPT_DIR}")"
+
+    # Try to detect from git if we're in a repo (check parent of install/)
+    if [[ -d "${_REPO_DIR}/.git" ]] || git -C "${_REPO_DIR}" rev-parse --git-dir &>/dev/null 2>&1; then
+        WARPIE_BRANCH=$(git -C "${_REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
     else
         WARPIE_BRANCH="main"
     fi
+    unset _SCRIPT_DIR _REPO_DIR
 fi
+
+# Export for use in functions and child processes
+export WARPIE_BRANCH
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -2756,6 +2769,9 @@ main() {
             echo "WarPie Wardriving System Installer v2.3.0"
             echo "============================================================================="
             echo ""
+            if [[ "${WARPIE_BRANCH}" != "main" ]]; then
+                log_info "Using branch: ${WARPIE_BRANCH}"
+            fi
 
             preflight_checks
             create_directories
