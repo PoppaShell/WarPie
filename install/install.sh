@@ -1620,6 +1620,9 @@ NMCONF_EOF
 configure_control_panel() {
     log_info "Installing Flask-based control panel..."
 
+    local branch="${WARPIE_BRANCH:-main}"
+    local base_url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}"
+
     # Install Python web dependencies
     log_info "Installing Flask and Waitress..."
     if ! pip3 install flask waitress --quiet --break-system-packages 2>/dev/null; then
@@ -1628,38 +1631,88 @@ configure_control_panel() {
         }
     fi
 
-    # Create installation directory
-    mkdir -p /usr/local/share/warpie
-
-    # Copy web package from source
-    if [[ -d "${SCRIPT_DIR}/../web" ]]; then
-        log_info "Copying web package..."
-        cp -r "${SCRIPT_DIR}/../web" /usr/local/share/warpie/
-    else
-        log_error "Web package not found at ${SCRIPT_DIR}/../web"
-        return 1
-    fi
-
-    # Copy entry point script
-    if [[ -f "${SCRIPT_DIR}/../bin/warpie-control" ]]; then
-        cp "${SCRIPT_DIR}/../bin/warpie-control" /usr/local/bin/warpie-control
-        chmod +x /usr/local/bin/warpie-control
-    else
-        log_error "Entry point not found at ${SCRIPT_DIR}/../bin/warpie-control"
-        return 1
-    fi
-
-    # Create target lists directory
+    # Create installation directories
+    mkdir -p /usr/local/share/warpie/web/routes
+    mkdir -p /usr/local/share/warpie/web/templates/partials
+    mkdir -p /usr/local/share/warpie/web/static
     mkdir -p /etc/warpie
 
-    # Install systemd service
+    # Download or copy web package
+    if [[ -d "${SCRIPT_DIR}/../web" ]]; then
+        log_info "Copying web package from local source..."
+        cp -r "${SCRIPT_DIR}/../web" /usr/local/share/warpie/
+    else
+        log_info "Downloading web package from ${branch} branch..."
+
+        # Core Python files
+        local web_files=(
+            "web/__init__.py"
+            "web/app.py"
+            "web/config.py"
+            "web/routes/__init__.py"
+            "web/routes/main.py"
+            "web/routes/filters.py"
+            "web/routes/targets.py"
+            "web/routes/logs.py"
+        )
+
+        # Template files
+        local template_files=(
+            "web/templates/base.html"
+            "web/templates/index.html"
+            "web/templates/partials/_status.html"
+            "web/templates/partials/_mode_buttons.html"
+            "web/templates/partials/_target_picker.html"
+            "web/templates/partials/_controls.html"
+            "web/templates/partials/_flyout_logs.html"
+            "web/templates/partials/_flyout_filters.html"
+            "web/templates/partials/_target_list_editor.html"
+            "web/templates/partials/_log_content.html"
+            "web/templates/partials/_toast.html"
+        )
+
+        # Static files
+        local static_files=(
+            "web/static/style.css"
+            "web/static/warpie.js"
+            "web/static/htmx.min.js"
+        )
+
+        # Download all files
+        for file in "${web_files[@]}" "${template_files[@]}" "${static_files[@]}"; do
+            local dest="/usr/local/share/warpie/${file}"
+            local url="${base_url}/${file}"
+            if ! curl -sSL "${url}" -o "${dest}" 2>/dev/null; then
+                log_error "Failed to download ${file}"
+                return 1
+            fi
+        done
+        log_success "Web package downloaded"
+    fi
+
+    # Download or copy entry point script
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-control" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-control" /usr/local/bin/warpie-control
+    else
+        log_info "Downloading warpie-control..."
+        if ! curl -sSL "${base_url}/bin/warpie-control" -o /usr/local/bin/warpie-control; then
+            log_error "Failed to download warpie-control"
+            return 1
+        fi
+    fi
+    chmod +x /usr/local/bin/warpie-control
+
+    # Download or copy systemd service
     if [[ -f "${SCRIPT_DIR}/../systemd/warpie-control.service" ]]; then
         cp "${SCRIPT_DIR}/../systemd/warpie-control.service" /etc/systemd/system/
     else
-        cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
+        log_info "Downloading warpie-control.service..."
+        if ! curl -sSL "${base_url}/systemd/warpie-control.service" -o /etc/systemd/system/warpie-control.service; then
+            # Fallback to embedded service definition
+            cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
 [Unit]
 Description=WarPie Control Panel
-Documentation=https://github.com/warpie/warpie
+Documentation=https://github.com/PoppaShell/WarPie
 After=network.target
 
 [Service]
@@ -1673,6 +1726,7 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 SERVICE_EOF
+        fi
     fi
 
     log_success "Control panel installed (Flask + HTMX)"
