@@ -109,16 +109,13 @@ def detect_btle_adapters() -> list[BTLEAdapter]:
             check=False,
         )
 
-        # Parse output like:
-        # ticc2540 supported data sources:
-        #     ticc2540-1-5 (ticc2540)
-        # Note: Output goes to stderr, not stdout
+        # Parse output - kismet outputs to stderr, format: "ticc2540-1-5 (ticc2540)"
         output = result.stderr if result.stderr else result.stdout
-        for line in output.splitlines():
-            line = line.strip()
+        for raw_line in output.splitlines():
+            stripped_line = raw_line.strip()
             # Look for lines like "ticc2540-1-5 (ticc2540)"
-            if line.startswith("ticc2540-") and "(ticc2540)" in line:
-                device_id = line.split()[0]  # e.g., "ticc2540-1-5"
+            if stripped_line.startswith("ticc2540-") and "(ticc2540)" in stripped_line:
+                device_id = stripped_line.split()[0]  # e.g., "ticc2540-1-5"
                 # Extract USB path from device_id (e.g., "1-5" from "ticc2540-1-5")
                 usb_path = device_id.replace("ticc2540-", "")
                 adapters.append(BTLEAdapter(device_id=device_id, usb_path=usb_path))
@@ -126,8 +123,8 @@ def detect_btle_adapters() -> list[BTLEAdapter]:
     except FileNotFoundError:
         # kismet_cap_ti_cc_2540 not installed
         pass
-    except Exception:
-        # Other errors - silently ignore
+    except Exception:  # noqa: S110
+        # Other errors - silently ignore during detection
         pass
 
     return adapters
@@ -598,9 +595,11 @@ def configure_btle(btle_adapters: list[BTLEAdapter]) -> dict[str, str] | None:
     )
 
     # Show detected adapters
-    console.print(f"\n[cyan]Detected BTLE adapter(s):[/cyan]")
+    console.print("\n[cyan]Detected BTLE adapter(s):[/cyan]")
     for adapter in btle_adapters:
-        console.print(f"  [bright_magenta]■[/bright_magenta] {adapter.device_id} (USB: {adapter.usb_path})")
+        console.print(
+            f"  [bright_magenta]■[/bright_magenta] {adapter.device_id} (USB: {adapter.usb_path})"
+        )
 
     if not inquirer.confirm(
         message="Enable BTLE capture?",
@@ -615,8 +614,7 @@ def configure_btle(btle_adapters: list[BTLEAdapter]) -> dict[str, str] | None:
     # If multiple adapters, let user choose
     if len(btle_adapters) > 1:
         choices = [
-            {"name": f"{a.device_id} (USB: {a.usb_path})", "value": a}
-            for a in btle_adapters
+            {"name": f"{a.device_id} (USB: {a.usb_path})", "value": a} for a in btle_adapters
         ]
         selected = inquirer.select(
             message="Select BTLE adapter:",
