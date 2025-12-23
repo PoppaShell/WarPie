@@ -283,3 +283,36 @@ document.body.addEventListener('htmx:afterSwap', function(evt) {
 document.body.addEventListener('htmx:responseError', function(evt) {
     showToast('Request failed', true);
 });
+
+// === Reboot/Shutdown Recovery ===
+
+let rebootCheckInterval = null;
+
+function startRebootCheck() {
+    // After reboot/shutdown initiated, poll until server responds, then reload
+    if (rebootCheckInterval) return;
+
+    rebootCheckInterval = setInterval(() => {
+        fetch('/api/status', { method: 'GET' })
+            .then(response => {
+                if (response.ok) {
+                    clearInterval(rebootCheckInterval);
+                    rebootCheckInterval = null;
+                    location.reload();
+                }
+            })
+            .catch(() => {
+                // Server still down, keep polling
+            });
+    }, 3000);
+}
+
+// Listen for reboot/shutdown button clicks
+document.body.addEventListener('htmx:afterRequest', function(evt) {
+    const path = evt.detail.pathInfo?.requestPath;
+    if (path === '/api/reboot' || path === '/api/shutdown') {
+        if (evt.detail.successful) {
+            startRebootCheck();
+        }
+    }
+});
