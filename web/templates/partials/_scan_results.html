@@ -1,0 +1,12 @@
+{% if error %}
+<div class="error-message">{{ error }}</div>
+{% elif networks %}
+{% for net in networks %}
+<div class="found-network">
+    <span class="network-bssid">{{ net.bssid }}</span>
+    <span class="network-signal">[{{ net.signal }}dBm]</span>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">No networks found matching "{{ ssid }}"</div>
+{% endif %}

@@ -4,7 +4,7 @@ import json
 import subprocess
 from pathlib import Path
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 from web.config import EXCLUDE_SCRIPT, FILTER_MANAGER_SCRIPT, FILTER_PROCESSOR_SCRIPT
 
@@ -66,7 +66,19 @@ def call_processor_script(*args) -> dict:
 @filters_bp.route("/filters")
 def api_list_filters():
     """List all exclusions (static and dynamic)."""
-    return jsonify(call_filter_script("--list"))
+    result = call_filter_script("--list")
+
+    # Return HTML for HTMX requests
+    if "text/html" in request.headers.get("Accept", ""):
+        static = result.get("static_exclusions", [])
+        dynamic = result.get("dynamic_exclusions", [])
+        return render_template(
+            "partials/_exclusion_list.html",
+            static_exclusions=static,
+            dynamic_exclusions=dynamic,
+        )
+
+    return jsonify(result)
 
 
 @filters_bp.route("/filters/recent")
@@ -200,4 +212,17 @@ def api_scan_ssid():
     if not ssid:
         return jsonify({"success": False, "error": "SSID required"}), 400
 
-    return jsonify(call_filter_script("--discover", ssid))
+    result = call_filter_script("--discover", ssid)
+
+    # Return HTML for HTMX requests
+    if "text/html" in request.headers.get("Accept", ""):
+        networks = result.get("networks", [])
+        error = result.get("error", "")
+        return render_template(
+            "partials/_scan_results.html",
+            networks=networks,
+            error=error,
+            ssid=ssid,
+        )
+
+    return jsonify(result)

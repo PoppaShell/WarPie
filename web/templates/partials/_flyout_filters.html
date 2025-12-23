@@ -76,7 +76,7 @@
         <button class="btn btn-block" onclick="openCreateTargetList()">+ CREATE NEW LIST</button>
 
         <div class="target-lists" id="target-lists"
-             hx-get="/api/targets/lists"
+             hx-get="/api/targets/lists?view=manage"
              hx-trigger="load"
              hx-swap="innerHTML">
             <div class="loading"><span class="spinner"></span></div>

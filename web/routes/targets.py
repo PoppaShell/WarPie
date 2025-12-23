@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, render_template, request
 
 from web.config import TARGET_LISTS_CONFIG
 
@@ -91,12 +91,13 @@ def save_target_lists(lists: dict[str, Any]) -> bool:
         return False
 
 
-@targets_bp.route("/targets/lists")
-def api_list_target_lists():
-    """List all target lists."""
-    lists = load_target_lists()
+def get_target_lists_data() -> list[dict]:
+    """Get target lists formatted for display.
 
-    # Convert to list format with OUI counts
+    Returns:
+        List of target list dictionaries with counts.
+    """
+    lists = load_target_lists()
     result = []
     for list_id, list_data in lists.items():
         ouis = list_data.get("ouis", [])
@@ -112,6 +113,25 @@ def api_list_target_lists():
             "builtin_oui_count": builtin_count,
             "user_oui_count": user_count,
         })
+    return result
+
+
+@targets_bp.route("/targets/lists")
+def api_list_target_lists():
+    """List all target lists.
+
+    Returns HTML for HTMX or JSON based on Accept header.
+    Uses different templates based on context (target picker vs filter flyout).
+    """
+    result = get_target_lists_data()
+
+    # Return HTML for HTMX requests
+    if "text/html" in request.headers.get("Accept", ""):
+        # Check which template to use based on referer or query param
+        template_type = request.args.get("view", "checkboxes")
+        if template_type == "manage":
+            return render_template("partials/_target_lists.html", lists=result)
+        return render_template("partials/_target_list_checkboxes.html", lists=result)
 
     return jsonify({"success": True, "lists": result})
 

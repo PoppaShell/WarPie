@@ -1,0 +1,18 @@
+{% if lists %}
+{% for list in lists %}
+<div class="target-list-item">
+    <div class="target-list-info">
+        <span class="target-list-name">{{ list.name }}</span>
+        <span class="target-list-count">[{{ list.oui_count }} OUIs]</span>
+    </div>
+    <div class="target-list-actions">
+        <button class="btn-small" onclick="editTargetList('{{ list.id }}', '{{ list.name }}')">EDIT</button>
+        {% if not list.builtin %}
+        <button class="btn-small danger" onclick="deleteTargetList('{{ list.id }}')">[X]</button>
+        {% endif %}
+    </div>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">No target lists</div>
+{% endif %}
