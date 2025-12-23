@@ -8,14 +8,6 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='warpie.js') }}" defer></script>
-    <script>
-        // Configure HTMX to send JSON content-type for hx-vals
-        document.addEventListener('htmx:configRequest', function(evt) {
-            if (evt.detail.verb !== 'get' && evt.detail.headers) {
-                evt.detail.headers['Content-Type'] = 'application/json';
-            }
-        });
-    </script>
 </head>
 <body>
     <div class="container">

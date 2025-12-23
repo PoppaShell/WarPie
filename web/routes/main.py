@@ -199,9 +199,14 @@ def api_mode():
 
     Returns HTML partial for HTMX to swap into #status-panel.
     """
-    data = request.get_json() or {}
-    mode = data.get("mode", "")
-    target_lists = data.get("target_lists", [])
+    # Handle both JSON and form-encoded data (HTMX sends form-encoded by default)
+    if request.is_json:
+        data = request.get_json() or {}
+        mode = data.get("mode", "")
+        target_lists = data.get("target_lists", [])
+    else:
+        mode = request.form.get("mode", "")
+        target_lists = request.form.getlist("target_lists")
 
     if not mode:
         return jsonify({"success": False, "error": "Mode required"}), 400
