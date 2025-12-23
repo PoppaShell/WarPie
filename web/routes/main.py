@@ -136,18 +136,13 @@ def shutdown_system() -> bool:
         True if shutdown command was issued.
     """
     try:
-        # Stop services gracefully first
+        # Stop wardrive service gracefully first
         subprocess.run(
             ["sudo", "systemctl", "stop", "wardrive"],
             check=False,
             capture_output=True,
         )
-        subprocess.run(
-            ["sudo", "systemctl", "stop", "warpie-control"],
-            check=False,
-            capture_output=True,
-        )
-        # Initiate shutdown
+        # Initiate shutdown - systemd will stop warpie-control as part of shutdown
         subprocess.Popen(
             ["sudo", "shutdown", "-h", "now"],
             start_new_session=True,
