@@ -3,14 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}WarPie Control{% endblock %}</title>
+    <title>{% block title %}WarPie Controller{% endblock %}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <script src="{{ url_for('static', filename='htmx.min.js') }}" defer></script>
     <script src="{{ url_for('static', filename='warpie.js') }}" defer></script>
 </head>
 <body>
-    <div class="scanlines"></div>
-
     <div class="container">
         {% block content %}{% endblock %}
     </div>

@@ -260,10 +260,10 @@ document.addEventListener('DOMContentLoaded', () => {
         radio.addEventListener('change', function() {
             const hint = document.getElementById('type-hint');
             if (this.value === 'static') {
-                hint.innerHTML = '<strong>Static:</strong> Block at capture time. Use for home networks, neighbors.';
+                hint.textContent = 'Static: Block at capture time. Use for home networks, neighbors.';
                 hint.classList.remove('dynamic');
             } else {
-                hint.innerHTML = '<strong>Dynamic:</strong> Post-process removal. Use for iPhone/Android hotspots with rotating MACs.';
+                hint.textContent = 'Dynamic: Post-process removal. Use for iPhone/Android hotspots with rotating MACs.';
                 hint.classList.add('dynamic');
             }
         });

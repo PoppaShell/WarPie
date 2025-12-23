@@ -1,29 +1,31 @@
 <div class="flyout-header">
-    <h2>Live Logs</h2>
-    <button class="flyout-close" onclick="closeLogs()">&times;</button>
+    <h2>[LOGS]</h2>
+    <button class="flyout-close" onclick="closeLogs()">[X]</button>
 </div>
 
-<div class="log-controls">
-    <select id="log-source" onchange="refreshLogs()">
-        <option value="wigle">WiGLE CSV</option>
-        <option value="wardrive">Wardrive Service</option>
-        <option value="kismet">Kismet Output</option>
-        <option value="gps">GPS Daemon</option>
-        <option value="network">Network Manager</option>
-    </select>
-    <button class="btn btn-small" onclick="refreshLogs()">Refresh</button>
-</div>
-
-<div class="log-content" id="log-content"
-     hx-get="/api/logs/html?source=wardrive"
-     hx-trigger="load, every 3s[isLogFlyoutOpen()]"
-     hx-swap="innerHTML">
-    <div class="loading">
-        <span class="spinner"></span>
-        Loading logs...
+<div class="flyout-content">
+    <div class="log-controls">
+        <select id="log-source" onchange="refreshLogs()">
+            <option value="wigle">WiGLE CSV</option>
+            <option value="wardrive">Wardrive Service</option>
+            <option value="kismet">Kismet Output</option>
+            <option value="gps">GPS Daemon</option>
+            <option value="network">Network Manager</option>
+        </select>
+        <button class="btn btn-small" onclick="refreshLogs()">REFRESH</button>
     </div>
-</div>
 
-<div class="log-status" id="log-status">
-    Last updated: --
+    <div class="log-content" id="log-content"
+         hx-get="/api/logs/html?source=wardrive"
+         hx-trigger="load, every 3s[isLogFlyoutOpen()]"
+         hx-swap="innerHTML">
+        <div class="loading">
+            <span class="spinner"></span>
+            Loading logs...
+        </div>
+    </div>
+
+    <div class="log-status" id="log-status">
+        Last updated: --
+    </div>
 </div>

@@ -1,28 +1,28 @@
 <div class="flyout-header">
-    <button class="flyout-back" onclick="closeTargetEditor()">&larr;</button>
-    <h2 id="target-editor-title">Edit Target List</h2>
-    <button class="flyout-close" onclick="closeTargetEditor()">&times;</button>
+    <button class="flyout-back" onclick="closeTargetEditor()">[<]</button>
+    <h2 id="target-editor-title">[EDIT LIST]</h2>
+    <button class="flyout-close" onclick="closeTargetEditor()">[X]</button>
 </div>
 
 <div class="flyout-content">
     <!-- Add OUI Form -->
     <div class="add-form">
-        <h4>Add OUI to List</h4>
+        <div class="section-title">ADD OUI</div>
         <div class="input-row">
             <input type="text" id="oui-input" class="input mono" placeholder="00:AA:BB:*">
         </div>
         <div class="input-row">
             <input type="text" id="oui-desc-input" class="input" placeholder="Description (optional)">
-            <button class="btn btn-primary" onclick="addOUIToList()">+ Add</button>
+            <button class="btn" onclick="addOUIToList()">+ ADD</button>
         </div>
         <div class="type-hint">
-            <strong>Format:</strong> XX:XX:XX:* (OUI prefix with wildcard)
+            Format: XX:XX:XX:* (OUI prefix with wildcard)
         </div>
     </div>
 
     <!-- OUI List -->
     <div class="oui-list-container">
-        <h4 class="list-title">OUIs in this List</h4>
+        <div class="section-title">OUIs IN LIST</div>
         <div class="oui-list" id="oui-list">
             <div class="loading"><span class="spinner"></span></div>
         </div>

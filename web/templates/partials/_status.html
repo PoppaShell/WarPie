@@ -1,21 +1,15 @@
-<h2 class="panel-title">Status</h2>
-<div class="status-grid">
-    <div class="status-item">
-        <span class="status-label">Mode</span>
-        <span class="status-value mode-{{ current_mode|lower }}">{{ current_mode }}</span>
+<div class="title">[STATUS]</div>
+<div class="content">
+    <div class="status-row">
+        <span class="status-label">KISMET</span>
+        <span class="status-value {% if status == 'Running' %}running{% else %}stopped{% endif %}">[{{ status|upper }}]</span>
     </div>
-    <div class="status-item">
-        <span class="status-label">Uptime</span>
+    <div class="status-row">
+        <span class="status-label">MODE</span>
+        <span class="status-value">{{ current_mode|upper }}</span>
+    </div>
+    <div class="status-row">
+        <span class="status-label">UPTIME</span>
         <span class="status-value">{{ uptime }}</span>
-    </div>
-</div>
-<div class="status-row">
-    <div class="status-indicator {{ status_class }}">
-        <span class="indicator-dot"></span>
-        <span>Kismet: {{ status }}</span>
-    </div>
-    <div class="status-indicator">
-        <span class="gps-icon">&#128225;</span>
-        <span>GPS: {{ gps_status }}</span>
     </div>
 </div>

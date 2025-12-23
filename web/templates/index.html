@@ -1,51 +1,50 @@
 {% extends "base.html" %}
 
-{% block title %}WarPie Control Panel{% endblock %}
+{% block title %}WarPie Controller{% endblock %}
 
 {% block content %}
 <header class="header">
-    <h1 class="logo">WARPIE</h1>
-    <span class="subtitle">Control Panel</span>
+    <h1>WARPIE CONTROLLER</h1>
 </header>
 
 <!-- Status Panel -->
-<section class="panel" id="status-panel"
-         hx-get="/api/status/html"
-         hx-trigger="every 3s"
-         hx-swap="innerHTML">
+<div class="terminal-box" id="status-panel"
+     hx-get="/api/status/html"
+     hx-trigger="every 3s"
+     hx-swap="innerHTML">
     {% include "partials/_status.html" %}
-</section>
+</div>
 
 <!-- Mode Selection -->
-<section class="panel">
-    <h2 class="panel-title">Mode Select</h2>
-    <div class="mode-buttons" id="mode-buttons">
-        {% include "partials/_mode_buttons.html" %}
-    </div>
+<div class="terminal-box">
+    <div class="title">[MODE]</div>
+    <div class="content">
+        <div class="mode-grid" id="mode-buttons">
+            {% include "partials/_mode_buttons.html" %}
+        </div>
 
-    <!-- Target List Picker (shown when Targeted mode selected) -->
-    <div id="target-picker" class="target-picker hidden">
-        {% include "partials/_target_picker.html" %}
+        <!-- Target List Picker (shown when Targeted mode selected) -->
+        <div id="target-picker" class="target-picker hidden">
+            {% include "partials/_target_picker.html" %}
+        </div>
     </div>
-</section>
+</div>
 
 <!-- Controls -->
-<section class="panel">
-    <h2 class="panel-title">Controls</h2>
-    {% include "partials/_controls.html" %}
-</section>
+<div class="terminal-box">
+    <div class="title">[CONTROLS]</div>
+    <div class="content">
+        {% include "partials/_controls.html" %}
+    </div>
+</div>
+
+<hr class="separator">
 
 <!-- Navigation Links -->
-<nav class="nav-links">
-    <button class="nav-btn" onclick="openFilters()">
-        <span class="icon">&#9881;</span> Network Filters
-    </button>
-    <button class="nav-btn" onclick="openLogs()">
-        <span class="icon">&#128196;</span> Logs
-    </button>
-    <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">
-        <span class="icon">&#8599;</span> Kismet UI
-    </a>
+<nav class="nav-row">
+    <button class="nav-btn" onclick="openFilters()">FILTERS</button>
+    <button class="nav-btn" onclick="openLogs()">LOGS</button>
+    <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">KISMET</a>
 </nav>
 
 <!-- Flyout Overlay -->

@@ -1,28 +1,24 @@
 <div class="flyout-header">
-    <h2>Network Filters</h2>
-    <button class="flyout-close" onclick="closeFilters()">&times;</button>
+    <h2>[FILTERS]</h2>
+    <button class="flyout-close" onclick="closeFilters()">[X]</button>
 </div>
 
 <div class="flyout-content">
     <!-- View Toggle -->
     <div class="view-toggle">
-        <button class="toggle-btn active" id="btn-recent" onclick="showRecentFilters()">Recent</button>
-        <button class="toggle-btn" id="btn-all" onclick="showAllFilters()">All Filters</button>
+        <button class="toggle-btn active" id="btn-recent" onclick="showRecentFilters()">RECENT</button>
+        <button class="toggle-btn" id="btn-all" onclick="showAllFilters()">ALL</button>
     </div>
 
     <!-- Exclusions Section -->
     <div class="filter-section">
-        <h3 class="section-title">
-            <span class="section-icon">&#128683;</span>
-            Exclusions
-            <span class="section-hint">(Normal & Wardrive modes)</span>
-        </h3>
+        <h3 class="section-title">EXCLUSIONS</h3>
 
         <!-- Add Exclusion Form -->
         <div class="add-form">
             <div class="input-row">
                 <input type="text" id="ssid-input" class="input" placeholder="Enter SSID...">
-                <button class="btn btn-primary" onclick="scanSSID()">Scan</button>
+                <button class="btn" onclick="scanSSID()">SCAN</button>
             </div>
 
             <div class="filter-type-row">
@@ -37,7 +33,7 @@
             </div>
 
             <div class="type-hint" id="type-hint">
-                <strong>Static:</strong> Block at capture time. Use for home networks, neighbors.
+                Static: Block at capture time. Use for home networks, neighbors.
             </div>
 
             <!-- Scan Results (hidden by default) -->
@@ -45,19 +41,15 @@
                 <h4>Found Networks:</h4>
                 <div id="found-networks"></div>
                 <div class="method-buttons">
-                    <button class="btn method-bssid" onclick="addExclusion('bssid')">
-                        Add with BSSIDs
-                    </button>
-                    <button class="btn method-ssid" onclick="addExclusion('exact')">
-                        SSID Only
-                    </button>
+                    <button class="btn" onclick="addExclusion('bssid')">ADD BSSIDS</button>
+                    <button class="btn btn-secondary" onclick="addExclusion('exact')">SSID ONLY</button>
                 </div>
             </div>
         </div>
 
         <!-- Static Exclusions List -->
         <div class="exclusion-list-container">
-            <h4 class="list-title">Static Exclusions</h4>
+            <h4 class="section-title">Static Exclusions</h4>
             <div class="exclusion-list" id="static-exclusion-list"
                  hx-get="/api/filters"
                  hx-trigger="load"
@@ -68,26 +60,20 @@
 
         <!-- Dynamic Exclusions List -->
         <div class="exclusion-list-container">
-            <h4 class="list-title">Dynamic Exclusions <span class="hint">(post-process by SSID)</span></h4>
+            <h4 class="section-title">Dynamic Exclusions</h4>
             <div class="exclusion-list" id="dynamic-exclusion-list">
                 <div class="loading"><span class="spinner"></span></div>
             </div>
         </div>
     </div>
 
-    <div class="section-divider"></div>
+    <hr class="section-divider">
 
     <!-- Target Lists Section -->
     <div class="filter-section">
-        <h3 class="section-title">
-            <span class="section-icon">&#127919;</span>
-            Target Lists
-            <span class="section-hint">(Targeted mode inclusions)</span>
-        </h3>
+        <h3 class="section-title">TARGET LISTS</h3>
 
-        <button class="btn btn-secondary btn-block" onclick="openCreateTargetList()">
-            + Create New List
-        </button>
+        <button class="btn btn-block" onclick="openCreateTargetList()">+ CREATE NEW LIST</button>
 
         <div class="target-lists" id="target-lists"
              hx-get="/api/targets/lists"
@@ -97,26 +83,21 @@
         </div>
     </div>
 
-    <div class="section-divider"></div>
+    <hr class="section-divider">
 
     <!-- Actions Section -->
     <div class="filter-section">
-        <h3 class="section-title">
-            <span class="section-icon">&#128736;</span>
-            Actions
-        </h3>
+        <h3 class="section-title">ACTIONS</h3>
 
-        <div class="action-buttons">
-            <button class="btn btn-action"
+        <div class="btn-row">
+            <button class="btn"
                     hx-post="/api/filters/cleanup"
                     hx-confirm="Run retroactive cleanup? This will remove excluded networks from historical logs."
                     hx-indicator="#cleanup-spinner">
                 <span class="htmx-indicator" id="cleanup-spinner"><span class="spinner"></span></span>
-                Retroactive Cleanup
+                CLEANUP
             </button>
-            <button class="btn btn-action" onclick="openPreUpload()">
-                Pre-Upload Sanitize
-            </button>
+            <button class="btn" onclick="openPreUpload()">PRE-UPLOAD</button>
         </div>
     </div>
 </div>

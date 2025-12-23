@@ -39,31 +39,6 @@ def get_kismet_status() -> tuple[bool, str]:
         return False, "Unknown"
 
 
-def get_gps_status() -> str:
-    """Get GPS fix status.
-
-    Returns:
-        GPS status string (3D Fix, 2D Fix, No Fix, Active, N/A).
-    """
-    try:
-        result = subprocess.run(
-            ["gpspipe", "-w", "-n", "1"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-        if '"mode":3' in result.stdout:
-            return "3D Fix"
-        elif '"mode":2' in result.stdout:
-            return "2D Fix"
-        elif '"mode":1' in result.stdout:
-            return "No Fix"
-        return "Active"
-    except Exception:
-        return "N/A"
-
-
 def get_uptime() -> str:
     """Get system uptime formatted as hours and minutes.
 
@@ -169,7 +144,6 @@ def index():
         status="Running" if running else "Stopped",
         status_class="status-running" if running else "status-stopped",
         current_mode=current_mode,
-        gps_status=get_gps_status(),
         uptime=get_uptime(),
         modes=MODES,
         active_mode=current_mode.lower() if running else "",
@@ -183,7 +157,6 @@ def api_status():
     return jsonify({
         "running": running,
         "mode": mode,
-        "gps": get_gps_status(),
         "uptime": get_uptime(),
     })
 
@@ -198,7 +171,6 @@ def api_status_html():
         status="Running" if running else "Stopped",
         status_class="status-running" if running else "status-stopped",
         current_mode=current_mode,
-        gps_status=get_gps_status(),
         uptime=get_uptime(),
     )
 
