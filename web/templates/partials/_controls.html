@@ -11,6 +11,16 @@
         [X] STOP
     </button>
 
+    <button class="ctrl-btn warning"
+            hx-post="/api/reboot"
+            hx-confirm="Reboot WarPie? The Raspberry Pi will restart and you will temporarily lose connection."
+            hx-indicator="#reboot-spinner">
+        <span class="htmx-indicator" id="reboot-spinner">
+            <span class="spinner"></span>
+        </span>
+        [~] REBOOT
+    </button>
+
     <button class="ctrl-btn danger"
             hx-post="/api/shutdown"
             hx-confirm="Shutdown WarPie? The Raspberry Pi will power off and you will lose connection."

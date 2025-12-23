@@ -106,6 +106,29 @@ def switch_mode(mode: str, target_lists: list[str] | None = None) -> bool:
     return True
 
 
+def reboot_system() -> bool:
+    """Initiate graceful system reboot.
+
+    Returns:
+        True if reboot command was issued.
+    """
+    try:
+        # Stop services gracefully first
+        subprocess.run(
+            ["sudo", "systemctl", "stop", "wardrive"],
+            check=False,
+            capture_output=True,
+        )
+        # Initiate reboot
+        subprocess.Popen(
+            ["sudo", "shutdown", "-r", "now"],
+            start_new_session=True,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def shutdown_system() -> bool:
     """Initiate graceful system shutdown.
 
@@ -205,6 +228,18 @@ def api_mode():
         )
     else:
         return jsonify({"success": False, "error": "Failed to switch mode"}), 500
+
+
+@main_bp.route("/api/reboot", methods=["POST"])
+def api_reboot():
+    """Initiate graceful system reboot."""
+    success = reboot_system()
+
+    if success:
+        # Return a simple message - the page will disconnect when Pi reboots
+        return "<div class='status-row'><span class='status-value'>Rebooting...</span></div>"
+    else:
+        return jsonify({"success": False, "error": "Failed to initiate reboot"}), 500
 
 
 @main_bp.route("/api/shutdown", methods=["POST"])

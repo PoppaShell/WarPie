@@ -156,7 +156,7 @@ body::before {
 /* Control Grid */
 .control-grid {
     display: grid;
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 10px;
 }
 
@@ -173,6 +173,16 @@ body::before {
 
 .ctrl-btn:hover {
     background: var(--highlight);
+}
+
+.ctrl-btn.warning {
+    border-color: var(--warning);
+    color: var(--warning);
+}
+
+.ctrl-btn.warning:hover {
+    background: rgba(255, 170, 0, 0.1);
+    box-shadow: 0 0 10px rgba(255, 170, 0, 0.3);
 }
 
 .ctrl-btn.danger {
