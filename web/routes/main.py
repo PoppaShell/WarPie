@@ -177,7 +177,10 @@ def api_status_html():
 
 @main_bp.route("/api/mode", methods=["POST"])
 def api_mode():
-    """Switch capture mode."""
+    """Switch capture mode.
+
+    Returns HTML partial for HTMX to swap into #status-panel.
+    """
     data = request.get_json() or {}
     mode = data.get("mode", "")
     target_lists = data.get("target_lists", [])
@@ -191,11 +194,15 @@ def api_mode():
     success = switch_mode(mode, target_lists)
 
     if success:
-        return jsonify({
-            "success": True,
-            "mode": mode,
-            "message": f"Switched to {mode}" if mode != "stop" else "Kismet stopped",
-        })
+        # Return updated status HTML for HTMX
+        running, current_mode = get_kismet_status()
+        return render_template(
+            "partials/_status.html",
+            status="Running" if running else "Stopped",
+            status_class="status-running" if running else "status-stopped",
+            current_mode=current_mode,
+            uptime=get_uptime(),
+        )
     else:
         return jsonify({"success": False, "error": "Failed to switch mode"}), 500
 
@@ -206,9 +213,7 @@ def api_shutdown():
     success = shutdown_system()
 
     if success:
-        return jsonify({
-            "success": True,
-            "message": "Shutdown initiated. WarPie will power off shortly.",
-        })
+        # Return a simple message - the page will disconnect when Pi shuts down
+        return "<div class='status-row'><span class='status-value'>Shutting down...</span></div>"
     else:
         return jsonify({"success": False, "error": "Failed to initiate shutdown"}), 500
