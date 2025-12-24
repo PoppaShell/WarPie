@@ -4,13 +4,7 @@
 
 {% block content %}
 <header class="header">
-    <div class="header-top">
-        <h1>WARPIE CONTROLLER</h1>
-        <div class="font-controls">
-            <button class="font-btn" onclick="decreaseFontSize()" title="Decrease font size">A-</button>
-            <button class="font-btn" onclick="increaseFontSize()" title="Increase font size">A+</button>
-        </div>
-    </div>
+    <h1>WARPIE CONTROLLER</h1>
 </header>
 
 <!-- Status Panel -->
@@ -52,6 +46,14 @@
     <button class="nav-btn" onclick="openLogs()">LOGS</button>
     <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">KISMET</a>
 </nav>
+
+<!-- Bottom Bar -->
+<div class="bottom-bar">
+    <div class="font-controls">
+        <button class="font-btn" onclick="decreaseFontSize()" title="Decrease font size">A-</button>
+        <button class="font-btn" onclick="increaseFontSize()" title="Increase font size">A+</button>
+    </div>
+</div>
 
 <!-- Flyout Overlay -->
 <div class="flyout-overlay" id="flyout-overlay" onclick="closeAllFlyouts()"></div>

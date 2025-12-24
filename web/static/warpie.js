@@ -367,6 +367,43 @@ document.addEventListener('keydown', e => {
     }
 });
 
+// === Enter Key Submission ===
+
+document.addEventListener('DOMContentLoaded', () => {
+    // Static SSID input - Enter triggers scan
+    const staticInput = document.getElementById('static-ssid-input');
+    if (staticInput) {
+        staticInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                scanForStatic();
+            }
+        });
+    }
+
+    // Dynamic SSID input - Enter triggers add
+    const dynamicInput = document.getElementById('dynamic-ssid-input');
+    if (dynamicInput) {
+        dynamicInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addDynamicExclusion();
+            }
+        });
+    }
+
+    // OUI input in target editor - Enter triggers add
+    const ouiInput = document.getElementById('oui-input');
+    if (ouiInput) {
+        ouiInput.addEventListener('keydown', e => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                addOUIToList();
+            }
+        });
+    }
+});
+
 
 // === HTMX Event Handlers ===
 

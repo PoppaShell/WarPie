@@ -181,49 +181,95 @@ class FilterManager:
         config = FilterConfig()
         current_section = ""
 
-        if not FILTER_RULES_FILE.exists():
-            return config
+        # First, load from the new filter_rules.conf
+        if FILTER_RULES_FILE.exists():
+            content = FILTER_RULES_FILE.read_text()
+            for line in content.splitlines():
+                line = line.strip()
 
-        content = FILTER_RULES_FILE.read_text()
-        for line in content.splitlines():
-            line = line.strip()
+                # Section headers
+                if line == SECTION_STATIC:
+                    current_section = "static"
+                    continue
+                elif line == SECTION_DYNAMIC:
+                    current_section = "dynamic"
+                    continue
+                elif line == SECTION_SMART:
+                    current_section = "smart"
+                    continue
+                elif line == SECTION_TARGETS:
+                    current_section = "targets"
+                    continue
+                elif line.startswith("[") and line.endswith("]"):
+                    current_section = ""
+                    continue
 
-            # Section headers
-            if line == SECTION_STATIC:
-                current_section = "static"
-                continue
-            elif line == SECTION_DYNAMIC:
-                current_section = "dynamic"
-                continue
-            elif line == SECTION_SMART:
-                current_section = "smart"
-                continue
-            elif line == SECTION_TARGETS:
-                current_section = "targets"
-                continue
-            elif line.startswith("[") and line.endswith("]"):
-                current_section = ""
-                continue
+                # Skip comments and empty lines
+                if not line or line.startswith("#"):
+                    continue
 
-            # Skip comments and empty lines
-            if not line or line.startswith("#"):
-                continue
+                # Parse entry
+                parts = line.split("|", 2)
+                if len(parts) >= 2:
+                    entry = FilterEntry(
+                        value=parts[0],
+                        type=parts[1],
+                        description=parts[2] if len(parts) > 2 else "",
+                    )
 
-            # Parse entry
-            parts = line.split("|", 2)
-            if len(parts) >= 2:
-                entry = FilterEntry(
-                    value=parts[0],
-                    type=parts[1],
-                    description=parts[2] if len(parts) > 2 else "",
-                )
+                    if current_section == "static":
+                        config.static_exclusions.append(entry)
+                    elif current_section == "dynamic":
+                        config.dynamic_exclusions.append(entry)
+                    elif current_section == "targets":
+                        config.targeting_inclusions.append(entry)
 
-                if current_section == "static":
-                    config.static_exclusions.append(entry)
-                elif current_section == "dynamic":
-                    config.dynamic_exclusions.append(entry)
-                elif current_section == "targets":
-                    config.targeting_inclusions.append(entry)
+        # Also load legacy exclusions from Kismet config files
+        # These were added by the installer directly to Kismet configs
+        seen_bssids = {e.value.upper() for e in config.static_exclusions if e.type == "bssid"}
+
+        for kismet_conf in [KISMET_SITE_CONF, KISMET_WARDRIVE_CONF]:
+            if kismet_conf.exists():
+                try:
+                    content = kismet_conf.read_text()
+                    ssid_context = ""
+                    for line in content.splitlines():
+                        line = line.strip()
+
+                        # Check for WARPIE_FILTER comment with SSID context
+                        if line.startswith("# WARPIE_FILTER:"):
+                            ssid_context = line.replace("# WARPIE_FILTER:", "").strip()
+                            continue
+
+                        # Check for home network exclusions comment
+                        if "Home network exclusion" in line or "Home WiFi" in line:
+                            ssid_context = "Home Network"
+                            continue
+
+                        # Parse kis_log_device_filter lines
+                        if line.startswith("kis_log_device_filter=IEEE802.11,"):
+                            parts = line.split(",")
+                            if len(parts) >= 3 and parts[2] == "block":
+                                bssid_or_mask = parts[1]
+                                # Handle masked BSSIDs (00:XX:XX:XX:XX:XX/00:FF:FF:FF:FF:FF)
+                                if "/" in bssid_or_mask:
+                                    bssid = bssid_or_mask.split("/")[0]
+                                else:
+                                    bssid = bssid_or_mask
+
+                                bssid_upper = bssid.upper()
+                                if bssid_upper not in seen_bssids:
+                                    seen_bssids.add(bssid_upper)
+                                    config.static_exclusions.append(
+                                        FilterEntry(
+                                            value=bssid,
+                                            type="bssid",
+                                            description=ssid_context if ssid_context else "Legacy Kismet filter",
+                                        )
+                                    )
+                                ssid_context = ""
+                except OSError:
+                    pass
 
         return config
 
