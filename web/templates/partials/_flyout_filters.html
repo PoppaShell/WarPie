@@ -3,6 +3,15 @@
     <button class="flyout-close" onclick="closeFilters()">[X]</button>
 </div>
 
+<!-- Unsaved Changes Banner - shows when filters modified -->
+<div id="unsaved-changes-banner" class="unsaved-banner hidden">
+    <span class="unsaved-text">Unsaved changes</span>
+    <div class="unsaved-actions">
+        <button class="btn btn-primary btn-small" onclick="applyChanges()">APPLY</button>
+        <button class="btn btn-small" onclick="discardChanges()">DISCARD</button>
+    </div>
+</div>
+
 <div class="flyout-content">
     <!-- STATIC EXCLUSIONS SECTION -->
     <div class="filter-section">

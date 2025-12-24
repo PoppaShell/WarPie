@@ -471,6 +471,38 @@ class FilterManager:
 
             return {}
 
+    def check_duplicate_static(self, value: str) -> bool:
+        """Check if a static exclusion already exists (case-insensitive).
+
+        Args:
+            value: SSID or BSSID to check.
+
+        Returns:
+            True if duplicate exists.
+        """
+        config = self.load_config()
+        value_upper = value.upper()
+        for entry in config.static_exclusions:
+            if entry.value.upper() == value_upper:
+                return True
+        return False
+
+    def check_duplicate_dynamic(self, value: str) -> bool:
+        """Check if a dynamic exclusion already exists (case-insensitive).
+
+        Args:
+            value: SSID to check.
+
+        Returns:
+            True if duplicate exists.
+        """
+        config = self.load_config()
+        value_upper = value.upper()
+        for entry in config.dynamic_exclusions:
+            if entry.value.upper() == value_upper:
+                return True
+        return False
+
     def add_static(
         self,
         ssid: str,
@@ -494,19 +526,26 @@ class FilterManager:
         if match_type not in ("exact", "pattern", "bssid"):
             self.json_error("Type must be: exact, pattern, or bssid")
 
+        # Check for duplicates (case-insensitive)
+        if self.check_duplicate_static(ssid):
+            self.json_error(f"'{ssid}' already exists in static exclusions")
+            return
+
         # Add to config
         entry = f"{ssid}|{match_type}|{description}"
         self.add_to_section(SECTION_STATIC, entry)
 
-        # If we have BSSIDs, also add them
+        # If we have BSSIDs, also add them (skip duplicates)
+        added_bssids = []
         if bssids:
             for bssid in bssids.split(","):
                 bssid = bssid.strip()
-                if bssid:
+                if bssid and not self.check_duplicate_static(bssid):
                     self.add_to_section(SECTION_STATIC, f"{bssid}|bssid|{description} BSSID")
+                    added_bssids.append(bssid)
 
         # Apply to Kismet configs
-        self.apply_static_filter(ssid, match_type, bssids)
+        self.apply_static_filter(ssid, match_type, ",".join(added_bssids) if added_bssids else "")
 
         self.json_success(f"Static exclusion added for '{ssid}'")
 
@@ -527,6 +566,11 @@ class FilterManager:
 
         if match_type not in ("exact", "pattern"):
             self.json_error("Type must be: exact or pattern")
+
+        # Check for duplicates (case-insensitive)
+        if self.check_duplicate_dynamic(ssid):
+            self.json_error(f"'{ssid}' already exists in dynamic exclusions")
+            return
 
         # Add to config - dynamic exclusions NEVER get BSSIDs
         entry = f"{ssid}|{match_type}|{description}"
@@ -596,21 +640,33 @@ class FilterManager:
         self.ensure_config_dir()
 
         # Escape special characters for sed
-        escaped_value = value.replace("*", "\\*").replace("/", "\\/")
+        escaped_value = value.replace("*", "\\*").replace("/", "\\/").replace(":", "\\:")
 
-        # Remove from config file
-        subprocess.run(
-            ["sudo", "sed", "-i", f"/^{escaped_value}|/d", str(FILTER_RULES_FILE)],
-            check=True,
-        )
+        # Remove from config file (new format)
+        if FILTER_RULES_FILE.exists():
+            subprocess.run(
+                ["sudo", "sed", "-i", f"/^{escaped_value}|/d", str(FILTER_RULES_FILE)],
+                check=False,
+            )
 
-        # Remove from Kismet configs
+        # Remove from Kismet configs - handle both new WARPIE_FILTER comments
+        # and legacy kis_log_device_filter entries
         for config in [KISMET_SITE_CONF, KISMET_WARDRIVE_CONF]:
             if config.exists():
+                # Remove WARPIE_FILTER comment lines for this value
                 marker = f"# WARPIE_FILTER: {value}"
-                escaped_marker = marker.replace("*", "\\*")
+                escaped_marker = marker.replace("*", "\\*").replace(":", "\\:")
                 subprocess.run(
                     ["sudo", "sed", "-i", f"/{escaped_marker}/d", str(config)],
+                    check=False,
+                )
+
+                # Remove legacy kis_log_device_filter entries with this BSSID
+                # Match: kis_log_device_filter=IEEE802.11,XX:XX:XX:XX:XX:XX,block
+                # or: kis_log_device_filter=IEEE802.11,XX:XX:XX:XX:XX:XX/FF:FF:FF:FF:FF:FF,block
+                bssid_upper = value.upper().replace(":", "\\:")
+                subprocess.run(
+                    ["sudo", "sed", "-i", f"/kis_log_device_filter=IEEE802.11,{bssid_upper}/d", str(config)],
                     check=False,
                 )
 

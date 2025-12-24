@@ -20,51 +20,35 @@ function clearUnsavedChanges() {
 
 function updateUnsavedUI() {
     const banner = document.getElementById('unsaved-changes-banner');
-    const modeButtons = document.querySelectorAll('.mode-btn');
-
     if (hasUnsavedChanges) {
-        // Show the unsaved changes banner
         if (banner) banner.classList.remove('hidden');
-        // Gray out mode buttons
-        modeButtons.forEach(btn => {
-            btn.classList.add('disabled');
-            btn.setAttribute('data-original-onclick', btn.getAttribute('onclick') || '');
-            btn.removeAttribute('hx-post');
-        });
     } else {
-        // Hide banner
         if (banner) banner.classList.add('hidden');
-        // Restore mode buttons
-        modeButtons.forEach(btn => {
-            btn.classList.remove('disabled');
-        });
     }
 }
 
-function applyChangesAndClose() {
-    // Call cleanup endpoint then clear state
-    fetch('/api/filters/cleanup', {method: 'POST'})
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) {
-                showToast('Changes applied');
-                clearUnsavedChanges();
-                // Refresh mode buttons to restore HTMX attrs
-                htmx.ajax('GET', '/api/mode-buttons', '#mode-buttons');
-            } else {
-                showToast(data.error || 'Failed to apply', true);
-            }
-        })
-        .catch(() => showToast('Failed to apply changes', true));
+function applyChanges() {
+    // Changes are already saved to config - just clear state and show confirmation
+    showToast('Changes saved');
+    clearUnsavedChanges();
 }
 
 function discardChanges() {
-    if (confirm('Discard unsaved filter changes?')) {
-        clearUnsavedChanges();
-        // Refresh mode buttons
-        htmx.ajax('GET', '/api/mode-buttons', '#mode-buttons');
-    }
+    // Reload filter lists from server to discard local view
+    clearUnsavedChanges();
+    htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
+    htmx.ajax('GET', '/api/filters/dynamic?limit=5', '#dynamic-exclusion-list');
+    showToast('Changes discarded');
 }
+
+// Warn on page unload if unsaved changes
+window.addEventListener('beforeunload', function(e) {
+    if (hasUnsavedChanges) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved filter changes. Are you sure you want to leave?';
+        return e.returnValue;
+    }
+});
 
 // === Font Size Controls ===
 

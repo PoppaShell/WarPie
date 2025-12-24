@@ -814,12 +814,6 @@ select option {
     opacity: 0.7;
 }
 
-.mode-btn.disabled {
-    pointer-events: none;
-    opacity: 0.4;
-    border-color: var(--fg-dim);
-}
-
 /* Unsaved Changes Banner */
 .unsaved-banner {
     display: flex;
@@ -997,15 +991,14 @@ select option {
     display: none;
     position: absolute;
     bottom: 100%;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 0;
+    transform: none;
     background: var(--bg);
     border: 1px solid var(--fg);
     padding: 8px 10px;
     font-size: calc(11px * var(--font-scale));
     white-space: normal;
-    width: max-content;
-    max-width: 250px;
+    width: 220px;
     z-index: 100;
     margin-bottom: 5px;
     text-align: left;
@@ -1017,32 +1010,21 @@ select option {
     display: block;
 }
 
-/* Arrow for tooltip */
+/* Arrow for tooltip - positioned on right side */
 .tooltip-content::after {
     content: "";
     position: absolute;
     top: 100%;
-    left: 50%;
-    transform: translateX(-50%);
+    right: 10px;
     border: 5px solid transparent;
     border-top-color: var(--fg);
 }
 
-/* Mobile tooltip adjustments */
+/* Mobile tooltip adjustments - position above trigger, right-aligned */
 @media (max-width: 480px) {
     .tooltip-content {
-        position: fixed;
-        bottom: auto;
-        top: 50%;
-        left: 50% !important;
-        right: auto !important;
-        transform: translate(-50%, -50%);
-        max-width: calc(100vw - 40px);
-        margin-bottom: 0;
-    }
-
-    .tooltip-content::after {
-        display: none;
+        width: calc(100vw - 60px);
+        max-width: 280px;
     }
 }
 
