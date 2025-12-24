@@ -37,16 +37,14 @@
     <!-- DYNAMIC EXCLUSIONS SECTION -->
     <div class="filter-section">
         <h3 class="section-title">DYNAMIC EXCLUSIONS</h3>
-        <p class="section-desc">Post-process removal by SSID. For iPhone/Android hotspots with rotating MACs.</p>
+        <p class="section-desc">Removed during post-processing. For networks with rotating MACs (mobile hotspots, etc).</p>
 
         <!-- Dynamic Add Form - No Scan Needed -->
         <div class="add-form">
             <div class="input-row">
-                <input type="text" id="dynamic-ssid-input" class="input" placeholder="Enter SSID or pattern...">
+                <input type="text" id="dynamic-ssid-input" class="input" placeholder="SSID or pattern (* = wildcard)">
                 <button class="btn" onclick="addDynamicExclusion()">ADD</button>
-            </div>
-            <div class="pattern-hint">
-                Use * for wildcard (e.g., "iPhone*" matches all iPhone hotspots)
+                <span class="help-icon" title="Wildcard examples:&#10;Guest* - matches Guest, Guest-5G, GuestWiFi&#10;*Hotspot - matches MyHotspot, Phone Hotspot&#10;Net?ork - matches Network, Netw0rk">?</span>
             </div>
         </div>
 

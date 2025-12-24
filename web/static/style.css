@@ -884,10 +884,45 @@ select option {
     font-size: 10px;
 }
 
-.method-buttons {
+.method-buttons,
+.scan-actions {
     display: flex;
     gap: 8px;
     margin-top: 10px;
+}
+
+/* Help Icon (tooltip) */
+.help-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border: 1px solid var(--fg-dim);
+    border-radius: 50%;
+    color: var(--fg-dim);
+    font-size: 11px;
+    cursor: help;
+    flex-shrink: 0;
+}
+
+.help-icon:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+}
+
+/* Section description */
+.section-desc {
+    font-size: 11px;
+    color: var(--fg-dim);
+    margin-bottom: 10px;
+}
+
+/* Pattern hint */
+.pattern-hint {
+    font-size: 10px;
+    color: var(--fg-dim);
+    margin-top: 5px;
 }
 
 /* Responsive */
