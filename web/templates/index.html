@@ -4,7 +4,13 @@
 
 {% block content %}
 <header class="header">
-    <h1>WARPIE CONTROLLER</h1>
+    <div class="header-top">
+        <h1>WARPIE CONTROLLER</h1>
+        <div class="font-controls">
+            <button class="font-btn" onclick="decreaseFontSize()" title="Decrease font size">A-</button>
+            <button class="font-btn" onclick="increaseFontSize()" title="Increase font size">A+</button>
+        </div>
+    </div>
 </header>
 
 <!-- Status Panel -->
@@ -63,5 +69,15 @@
 <!-- Target List Editor Flyout -->
 <div class="flyout sub-flyout" id="target-editor-flyout">
     {% include "partials/_target_list_editor.html" %}
+</div>
+
+<!-- Static Exclusions Manager Flyout -->
+<div class="flyout sub-flyout" id="static-manager-flyout">
+    {% include "partials/_static_manager.html" %}
+</div>
+
+<!-- Dynamic Exclusions Manager Flyout -->
+<div class="flyout sub-flyout" id="dynamic-manager-flyout">
+    {% include "partials/_dynamic_manager.html" %}
 </div>
 {% endblock %}

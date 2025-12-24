@@ -4,6 +4,36 @@
  * This file only handles local UI state (flyouts, toasts).
  */
 
+// === Font Size Controls ===
+
+const FONT_SCALE_MIN = 0.8;
+const FONT_SCALE_MAX = 1.4;
+const FONT_SCALE_STEP = 0.1;
+
+function getFontScale() {
+    const saved = localStorage.getItem('warpie-font-scale');
+    return saved ? parseFloat(saved) : 1;
+}
+
+function setFontScale(scale) {
+    scale = Math.max(FONT_SCALE_MIN, Math.min(FONT_SCALE_MAX, scale));
+    document.documentElement.style.setProperty('--font-scale', scale);
+    localStorage.setItem('warpie-font-scale', scale);
+}
+
+function increaseFontSize() {
+    setFontScale(getFontScale() + FONT_SCALE_STEP);
+}
+
+function decreaseFontSize() {
+    setFontScale(getFontScale() - FONT_SCALE_STEP);
+}
+
+// Apply saved font scale on load
+document.addEventListener('DOMContentLoaded', () => {
+    setFontScale(getFontScale());
+});
+
 // === Flyout Management ===
 
 function openLogs() {
@@ -42,6 +72,26 @@ function openTargetEditor(listId, listName) {
 
 function closeTargetEditor() {
     document.getElementById('target-editor-flyout').classList.remove('open');
+}
+
+// Static Exclusions Manager
+function openStaticManager() {
+    document.getElementById('static-manager-flyout').classList.add('open');
+    htmx.ajax('GET', '/api/filters/static', '#static-manager-list');
+}
+
+function closeStaticManager() {
+    document.getElementById('static-manager-flyout').classList.remove('open');
+}
+
+// Dynamic Exclusions Manager
+function openDynamicManager() {
+    document.getElementById('dynamic-manager-flyout').classList.add('open');
+    htmx.ajax('GET', '/api/filters/dynamic', '#dynamic-manager-list');
+}
+
+function closeDynamicManager() {
+    document.getElementById('dynamic-manager-flyout').classList.remove('open');
 }
 
 // === Target Mode ===

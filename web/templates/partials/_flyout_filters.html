@@ -7,7 +7,7 @@
     <!-- STATIC EXCLUSIONS SECTION -->
     <div class="filter-section">
         <h3 class="section-title">STATIC EXCLUSIONS</h3>
-        <p class="section-desc">Block at capture time via BSSID. For home networks, neighbors with stable MACs.</p>
+        <p class="section-desc">Block at capture time via BSSID. For networks with static MACs.</p>
 
         <!-- Static Add Form - Needs Scan -->
         <div class="add-form">
@@ -23,9 +23,13 @@
             </div>
         </div>
 
-        <!-- Static Exclusions List -->
+        <!-- Recent Static Exclusions -->
+        <div class="exclusion-list-header">
+            <span>Recently Added</span>
+            <button class="btn btn-small" onclick="openStaticManager()">VIEW ALL</button>
+        </div>
         <div class="exclusion-list" id="static-exclusion-list"
-             hx-get="/api/filters/static"
+             hx-get="/api/filters/static?limit=5"
              hx-trigger="load"
              hx-swap="innerHTML">
             <div class="loading"><span class="spinner"></span></div>
@@ -37,20 +41,23 @@
     <!-- DYNAMIC EXCLUSIONS SECTION -->
     <div class="filter-section">
         <h3 class="section-title">DYNAMIC EXCLUSIONS</h3>
-        <p class="section-desc">Removed during post-processing. For networks with rotating MACs (mobile hotspots, etc).</p>
+        <p class="section-desc">Removed during post-processing. For networks with rotating MACs. Wildcards supported <span class="tooltip-trigger">[?]<span class="tooltip-content">Wildcard examples:<br>Guest* - matches Guest, Guest-5G<br>*Hotspot - matches MyHotspot<br>Net?ork - matches Network, Netw0rk</span></span></p>
 
         <!-- Dynamic Add Form - No Scan Needed -->
         <div class="add-form">
             <div class="input-row">
                 <input type="text" id="dynamic-ssid-input" class="input" placeholder="SSID or pattern (* = wildcard)">
                 <button class="btn" onclick="addDynamicExclusion()">ADD</button>
-                <span class="help-icon" title="Wildcard examples:&#10;Guest* - matches Guest, Guest-5G, GuestWiFi&#10;*Hotspot - matches MyHotspot, Phone Hotspot&#10;Net?ork - matches Network, Netw0rk">?</span>
             </div>
         </div>
 
-        <!-- Dynamic Exclusions List -->
+        <!-- Recent Dynamic Exclusions -->
+        <div class="exclusion-list-header">
+            <span>Recently Added</span>
+            <button class="btn btn-small" onclick="openDynamicManager()">VIEW ALL</button>
+        </div>
         <div class="exclusion-list" id="dynamic-exclusion-list"
-             hx-get="/api/filters/dynamic"
+             hx-get="/api/filters/dynamic?limit=5"
              hx-trigger="load"
              hx-swap="innerHTML">
             <div class="loading"><span class="spinner"></span></div>

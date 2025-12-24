@@ -15,13 +15,14 @@
     --highlight: #003300;
     --error: #ff0000;
     --warning: #ffaa00;
+    --font-scale: 1;
 }
 
 body {
     background: var(--bg);
     color: var(--fg);
     font-family: 'Courier New', Courier, monospace;
-    font-size: 14px;
+    font-size: calc(14px * var(--font-scale));
     line-height: 1.4;
     min-height: 100vh;
     padding: 10px;
@@ -53,18 +54,44 @@ body::before {
 
 /* Header */
 .header {
-    text-align: center;
     margin-bottom: 20px;
     padding: 15px;
     border: 1px solid var(--border);
     background: rgba(0, 255, 0, 0.05);
 }
 
+.header-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
 .header h1 {
-    font-size: 20px;
+    font-size: calc(20px * var(--font-scale));
     color: var(--fg-bright);
     letter-spacing: 3px;
     font-weight: bold;
+}
+
+/* Font Size Controls */
+.font-controls {
+    display: flex;
+    gap: 5px;
+}
+
+.font-btn {
+    background: var(--bg);
+    border: 1px solid var(--fg-dim);
+    color: var(--fg-dim);
+    padding: 3px 8px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+}
+
+.font-btn:hover {
+    border-color: var(--fg);
+    color: var(--fg);
 }
 
 /* Terminal Box */
@@ -338,6 +365,11 @@ body::before {
     padding: 8px;
     font-family: inherit;
     font-size: 12px;
+}
+
+.input::placeholder {
+    color: #00aa00;
+    opacity: 0.7;
 }
 
 .form-input:focus,
@@ -891,24 +923,44 @@ select option {
     margin-top: 10px;
 }
 
-/* Help Icon (tooltip) */
-.help-icon {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 18px;
-    height: 18px;
-    border: 1px solid var(--fg-dim);
-    border-radius: 50%;
-    color: var(--fg-dim);
-    font-size: 11px;
+/* Tooltip */
+.tooltip-trigger {
+    position: relative;
     cursor: help;
-    flex-shrink: 0;
+    color: var(--fg);
 }
 
-.help-icon:hover {
-    border-color: var(--fg);
-    color: var(--fg);
+.tooltip-content {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg);
+    border: 1px solid var(--fg);
+    padding: 8px 10px;
+    font-size: 11px;
+    white-space: nowrap;
+    z-index: 100;
+    margin-bottom: 5px;
+    text-align: left;
+    line-height: 1.6;
+}
+
+.tooltip-trigger:hover .tooltip-content,
+.tooltip-trigger:focus .tooltip-content {
+    display: block;
+}
+
+/* Arrow for tooltip */
+.tooltip-content::after {
+    content: "";
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 5px solid transparent;
+    border-top-color: var(--fg);
 }
 
 /* Section description */
@@ -916,6 +968,17 @@ select option {
     font-size: 11px;
     color: var(--fg-dim);
     margin-bottom: 10px;
+}
+
+/* Exclusion list header */
+.exclusion-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 10px;
+    color: var(--fg-dim);
+    margin-bottom: 5px;
+    padding-top: 5px;
 }
 
 /* Pattern hint */

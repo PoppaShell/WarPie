@@ -86,6 +86,11 @@ def api_list_static():
 
     static = result.get("static_exclusions", [])
 
+    # Apply limit if specified
+    limit = request.args.get("limit", type=int)
+    if limit and limit > 0:
+        static = static[:limit]
+
     # Return HTML for HTMX requests
     if request.headers.get("HX-Request"):
         return render_template(
@@ -103,6 +108,11 @@ def api_list_dynamic():
     result = call_filter_script("--list")
 
     dynamic = result.get("dynamic_exclusions", [])
+
+    # Apply limit if specified
+    limit = request.args.get("limit", type=int)
+    if limit and limit > 0:
+        dynamic = dynamic[:limit]
 
     # Return HTML for HTMX requests
     if request.headers.get("HX-Request"):
