@@ -120,14 +120,14 @@ def get_target_lists_data() -> list[dict]:
 def api_list_target_lists():
     """List all target lists.
 
-    Returns HTML for HTMX or JSON based on Accept header.
+    Returns HTML for HTMX or JSON based on HX-Request header.
     Uses different templates based on context (target picker vs filter flyout).
     """
     result = get_target_lists_data()
 
-    # Return HTML for HTMX requests
-    if "text/html" in request.headers.get("Accept", ""):
-        # Check which template to use based on referer or query param
+    # Return HTML for HTMX requests (HTMX sends HX-Request: true header)
+    if request.headers.get("HX-Request"):
+        # Check which template to use based on query param
         template_type = request.args.get("view", "checkboxes")
         if template_type == "manage":
             return render_template("partials/_target_lists.html", lists=result)

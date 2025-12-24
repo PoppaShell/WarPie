@@ -68,8 +68,8 @@ def api_list_filters():
     """List all exclusions (static and dynamic)."""
     result = call_filter_script("--list")
 
-    # Return HTML for HTMX requests
-    if "text/html" in request.headers.get("Accept", ""):
+    # Return HTML for HTMX requests (HTMX sends HX-Request: true header)
+    if request.headers.get("HX-Request"):
         static = result.get("static_exclusions", [])
         dynamic = result.get("dynamic_exclusions", [])
         return render_template(
@@ -214,8 +214,8 @@ def api_scan_ssid():
 
     result = call_filter_script("--discover", ssid)
 
-    # Return HTML for HTMX requests
-    if "text/html" in request.headers.get("Accept", ""):
+    # Return HTML for HTMX requests (HTMX sends HX-Request: true header)
+    if request.headers.get("HX-Request"):
         networks = result.get("networks", [])
         error = result.get("error", "")
         return render_template(

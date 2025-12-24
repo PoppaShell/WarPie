@@ -474,16 +474,8 @@ add_target_oui() {
         json_error "Invalid OUI format. Use XX:XX:XX:* or full MAC"
     fi
 
-    # Validate mode
-    local mode_config=""
-    case "$mode" in
-        )
-            mode_config="$KISMET__CONF"
-            ;;
-        *)
-            json_error "Unknown targeting mode: $mode. Available: "
-            ;;
-    esac
+    # All targeting modes use the site config
+    local mode_config="$KISMET_SITE_CONF"
 
     # Convert user format to Kismet mask format
     local kismet_oui kismet_mask
