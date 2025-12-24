@@ -5,8 +5,12 @@
 <div class="found-network">
     <span class="network-bssid">{{ net.bssid }}</span>
     <span class="network-signal">[{{ net.signal }}dBm]</span>
+    <button class="btn btn-small" onclick="addSingleBSSID('{{ net.bssid }}', '{{ ssid }}')">ADD</button>
 </div>
 {% endfor %}
+<div class="scan-actions">
+    <button class="btn" onclick="addAllBSSIDs()">ADD ALL</button>
+</div>
 {% else %}
 <div class="empty-state">No networks found matching "{{ ssid }}"</div>
 {% endif %}

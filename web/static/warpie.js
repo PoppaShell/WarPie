@@ -102,21 +102,51 @@ function scanForStatic() {
     });
 }
 
-function addStaticExclusion(matchType) {
+function addSingleBSSID(bssid, ssid) {
+    fetch('/api/filters/static', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ssid: bssid,
+            match_type: 'bssid',
+            description: 'SSID: ' + ssid
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Added ' + bssid);
+            htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
+        } else {
+            showToast(data.error || 'Failed to add', true);
+        }
+    });
+}
+
+function addAllBSSIDs() {
     const ssid = document.getElementById('static-ssid-input').value.trim();
+    const bssidElements = document.querySelectorAll('#static-found-networks .network-bssid');
+    const bssids = Array.from(bssidElements).map(el => el.textContent.trim());
+
+    if (bssids.length === 0) {
+        showToast('No BSSIDs to add', true);
+        return;
+    }
 
     fetch('/api/filters/static', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             ssid: ssid,
-            match_type: matchType
+            match_type: 'bssid',
+            bssids: bssids.join(','),
+            description: 'SSID: ' + ssid
         })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            showToast('Static exclusion added');
+            showToast('Added ' + bssids.length + ' BSSIDs');
             document.getElementById('static-ssid-input').value = '';
             document.getElementById('static-scan-results').classList.add('hidden');
             htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
