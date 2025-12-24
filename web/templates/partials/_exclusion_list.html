@@ -1,11 +1,11 @@
-{% if static_exclusions %}
-{% for item in static_exclusions %}
+{% if exclusions %}
+{% for item in exclusions %}
 <div class="exclusion-item">
-    <span class="exclusion-ssid">{{ item.ssid or item.bssid }}</span>
+    <span class="exclusion-ssid">{{ item.ssid or item.value }}</span>
     <span class="exclusion-type">[{{ item.type|upper }}]</span>
-    <button class="btn-remove" onclick="removeFilter('static', '{{ item.ssid or item.bssid }}')">[X]</button>
+    <button class="btn-remove" onclick="removeFilter('{{ exclusion_type }}', '{{ item.ssid or item.value }}')">[X]</button>
 </div>
 {% endfor %}
 {% else %}
-<div class="empty-state">No static exclusions</div>
+<div class="empty-state">No {{ exclusion_type }} exclusions</div>
 {% endif %}

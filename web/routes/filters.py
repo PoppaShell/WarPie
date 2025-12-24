@@ -76,46 +76,50 @@ def call_processor_script(*args) -> dict:
 def api_list_filters():
     """List all exclusions (static and dynamic)."""
     result = call_filter_script("--list")
+    return jsonify(result)
 
-    # Return HTML for HTMX requests (HTMX sends HX-Request: true header)
+
+@filters_bp.route("/filters/static")
+def api_list_static():
+    """List static exclusions only."""
+    result = call_filter_script("--list")
+
+    static = result.get("static_exclusions", [])
+
+    # Return HTML for HTMX requests
     if request.headers.get("HX-Request"):
-        static = result.get("static_exclusions", [])
-        dynamic = result.get("dynamic_exclusions", [])
         return render_template(
             "partials/_exclusion_list.html",
-            static_exclusions=static,
-            dynamic_exclusions=dynamic,
+            exclusions=static,
+            exclusion_type="static",
         )
 
-    return jsonify(result)
+    return jsonify({"success": True, "static_exclusions": static})
 
 
-@filters_bp.route("/filters/recent")
-def api_list_recent():
-    """List recently added filters."""
-    # Get last 10 filters added
+@filters_bp.route("/filters/dynamic")
+def api_list_dynamic():
+    """List dynamic exclusions only."""
     result = call_filter_script("--list")
-    if result.get("success", True):
-        # Combine and sort by timestamp, take last 10
-        static = result.get("static_exclusions", [])
-        dynamic = result.get("dynamic_exclusions", [])
-        all_filters = static + dynamic
-        # Sort by added_at if available, take last 10
-        recent = sorted(
-            all_filters,
-            key=lambda x: x.get("added_at", ""),
-            reverse=True,
-        )[:10]
-        return jsonify({"success": True, "recent": recent})
-    return jsonify(result)
+
+    dynamic = result.get("dynamic_exclusions", [])
+
+    # Return HTML for HTMX requests
+    if request.headers.get("HX-Request"):
+        return render_template(
+            "partials/_exclusion_list.html",
+            exclusions=dynamic,
+            exclusion_type="dynamic",
+        )
+
+    return jsonify({"success": True, "dynamic_exclusions": dynamic})
 
 
-@filters_bp.route("/filters", methods=["POST"])
-def api_add_filter():
-    """Add a new exclusion (static or dynamic)."""
+@filters_bp.route("/filters/static", methods=["POST"])
+def api_add_static():
+    """Add a static exclusion (BSSID-based, blocked at capture time)."""
     data = request.get_json() or {}
     ssid = data.get("ssid", "")
-    filter_type = data.get("filter_type", "static")
     match_type = data.get("match_type", "exact")
     bssids = data.get("bssids", "")
     desc = data.get("description", "")
@@ -123,25 +127,36 @@ def api_add_filter():
     if not ssid:
         return jsonify({"success": False, "error": "SSID required"}), 400
 
-    if filter_type == "dynamic":
-        args = ["--add-dynamic", "--ssid", ssid, "--type", match_type]
-        if desc:
-            args.extend(["--desc", desc])
-        return jsonify(call_filter_script(*args))
-    else:
-        args = ["--add-static", "--ssid", ssid, "--type", match_type]
-        if desc:
-            args.extend(["--desc", desc])
-        result = call_filter_script(*args)
+    args = ["--add-static", "--ssid", ssid, "--type", match_type]
+    if desc:
+        args.extend(["--desc", desc])
+    result = call_filter_script(*args)
 
-        # If BSSIDs provided, also add them
-        if bssids and result.get("success"):
-            for bssid in bssids.split(","):
-                bssid_clean = bssid.strip()
-                if bssid_clean:
-                    call_filter_script("--add-static", "--bssid", bssid_clean)
+    # If BSSIDs provided, also add them
+    if bssids and result.get("success"):
+        for bssid in bssids.split(","):
+            bssid_clean = bssid.strip()
+            if bssid_clean:
+                call_filter_script("--add-static", "--bssid", bssid_clean)
 
-        return jsonify(result)
+    return jsonify(result)
+
+
+@filters_bp.route("/filters/dynamic", methods=["POST"])
+def api_add_dynamic():
+    """Add a dynamic exclusion (SSID-only, post-processing removal)."""
+    data = request.get_json() or {}
+    ssid = data.get("ssid", "")
+    match_type = data.get("match_type", "exact")
+    desc = data.get("description", "")
+
+    if not ssid:
+        return jsonify({"success": False, "error": "SSID required"}), 400
+
+    args = ["--add-dynamic", "--ssid", ssid, "--type", match_type]
+    if desc:
+        args.extend(["--desc", desc])
+    return jsonify(call_filter_script(*args))
 
 
 @filters_bp.route("/filters/<filter_type>/<path:value>", methods=["DELETE"])

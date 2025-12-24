@@ -4,66 +4,62 @@
 </div>
 
 <div class="flyout-content">
-    <!-- View Toggle -->
-    <div class="view-toggle">
-        <button class="toggle-btn active" id="btn-recent" onclick="showRecentFilters()">RECENT</button>
-        <button class="toggle-btn" id="btn-all" onclick="showAllFilters()">ALL</button>
-    </div>
-
-    <!-- Exclusions Section -->
+    <!-- STATIC EXCLUSIONS SECTION -->
     <div class="filter-section">
-        <h3 class="section-title">EXCLUSIONS</h3>
+        <h3 class="section-title">STATIC EXCLUSIONS</h3>
+        <p class="section-desc">Block at capture time via BSSID. For home networks, neighbors with stable MACs.</p>
 
-        <!-- Add Exclusion Form -->
+        <!-- Static Add Form - Needs Scan -->
         <div class="add-form">
             <div class="input-row">
-                <input type="text" id="ssid-input" class="input" placeholder="Enter SSID...">
-                <button class="btn" onclick="scanSSID()">SCAN</button>
-            </div>
-
-            <div class="filter-type-row">
-                <label class="radio-label">
-                    <input type="radio" name="exclusion-type" value="static" checked>
-                    <span class="radio-text static">Static</span>
-                </label>
-                <label class="radio-label">
-                    <input type="radio" name="exclusion-type" value="dynamic">
-                    <span class="radio-text dynamic">Dynamic</span>
-                </label>
-            </div>
-
-            <div class="type-hint" id="type-hint">
-                Static: Block at capture time. Use for home networks, neighbors.
+                <input type="text" id="static-ssid-input" class="input" placeholder="Enter SSID to scan...">
+                <button class="btn" onclick="scanForStatic()">SCAN</button>
             </div>
 
             <!-- Scan Results (hidden by default) -->
-            <div class="scan-results hidden" id="scan-results">
+            <div class="scan-results hidden" id="static-scan-results">
                 <h4>Found Networks:</h4>
-                <div id="found-networks"></div>
+                <div id="static-found-networks"></div>
                 <div class="method-buttons">
-                    <button class="btn" onclick="addExclusion('bssid')">ADD BSSIDS</button>
-                    <button class="btn btn-secondary" onclick="addExclusion('exact')">SSID ONLY</button>
+                    <button class="btn" onclick="addStaticExclusion('bssid')">ADD BSSIDS</button>
+                    <button class="btn btn-secondary" onclick="addStaticExclusion('exact')">SSID ONLY</button>
                 </div>
             </div>
         </div>
 
         <!-- Static Exclusions List -->
-        <div class="exclusion-list-container">
-            <h4 class="section-title">Static Exclusions</h4>
-            <div class="exclusion-list" id="static-exclusion-list"
-                 hx-get="/api/filters"
-                 hx-trigger="load"
-                 hx-swap="innerHTML">
-                <div class="loading"><span class="spinner"></span></div>
+        <div class="exclusion-list" id="static-exclusion-list"
+             hx-get="/api/filters/static"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span></div>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- DYNAMIC EXCLUSIONS SECTION -->
+    <div class="filter-section">
+        <h3 class="section-title">DYNAMIC EXCLUSIONS</h3>
+        <p class="section-desc">Post-process removal by SSID. For iPhone/Android hotspots with rotating MACs.</p>
+
+        <!-- Dynamic Add Form - No Scan Needed -->
+        <div class="add-form">
+            <div class="input-row">
+                <input type="text" id="dynamic-ssid-input" class="input" placeholder="Enter SSID or pattern...">
+                <button class="btn" onclick="addDynamicExclusion()">ADD</button>
+            </div>
+            <div class="pattern-hint">
+                Use * for wildcard (e.g., "iPhone*" matches all iPhone hotspots)
             </div>
         </div>
 
         <!-- Dynamic Exclusions List -->
-        <div class="exclusion-list-container">
-            <h4 class="section-title">Dynamic Exclusions</h4>
-            <div class="exclusion-list" id="dynamic-exclusion-list">
-                <div class="loading"><span class="spinner"></span></div>
-            </div>
+        <div class="exclusion-list" id="dynamic-exclusion-list"
+             hx-get="/api/filters/dynamic"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span></div>
         </div>
     </div>
 

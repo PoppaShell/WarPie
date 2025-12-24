@@ -77,29 +77,17 @@ function refreshLogs() {
 
 // === Filter UI ===
 
-function showRecentFilters() {
-    document.getElementById('btn-recent').classList.add('active');
-    document.getElementById('btn-all').classList.remove('active');
-    // Load recent filters
-    htmx.ajax('GET', '/api/filters/recent', '#static-exclusion-list');
-}
+// --- Static Exclusions (scan-based, BSSID blocking) ---
 
-function showAllFilters() {
-    document.getElementById('btn-all').classList.add('active');
-    document.getElementById('btn-recent').classList.remove('active');
-    // Load all filters
-    htmx.ajax('GET', '/api/filters', '#static-exclusion-list');
-}
-
-function scanSSID() {
-    const ssid = document.getElementById('ssid-input').value.trim();
+function scanForStatic() {
+    const ssid = document.getElementById('static-ssid-input').value.trim();
     if (!ssid) {
         showToast('Please enter an SSID', true);
         return;
     }
     // Show scanning state
-    document.getElementById('found-networks').innerHTML = '<div class="loading"><span class="spinner"></span> Scanning...</div>';
-    document.getElementById('scan-results').classList.remove('hidden');
+    document.getElementById('static-found-networks').innerHTML = '<div class="loading"><span class="spinner"></span> Scanning...</div>';
+    document.getElementById('static-scan-results').classList.remove('hidden');
 
     // Use fetch instead of htmx.ajax to avoid global indicator triggering
     fetch('/api/scan-ssid?ssid=' + encodeURIComponent(ssid), {
@@ -107,38 +95,70 @@ function scanSSID() {
     })
     .then(response => response.text())
     .then(html => {
-        document.getElementById('found-networks').innerHTML = html;
+        document.getElementById('static-found-networks').innerHTML = html;
     })
     .catch(err => {
-        document.getElementById('found-networks').innerHTML = '<div class="error-message">Scan failed: ' + err.message + '</div>';
+        document.getElementById('static-found-networks').innerHTML = '<div class="error-message">Scan failed: ' + err.message + '</div>';
     });
 }
 
-function addExclusion(matchType) {
-    const ssid = document.getElementById('ssid-input').value.trim();
-    const filterType = document.querySelector('input[name="exclusion-type"]:checked').value;
+function addStaticExclusion(matchType) {
+    const ssid = document.getElementById('static-ssid-input').value.trim();
 
-    fetch('/api/filters', {
+    fetch('/api/filters/static', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             ssid: ssid,
-            filter_type: filterType,
             match_type: matchType
         })
     })
     .then(r => r.json())
     .then(data => {
         if (data.success) {
-            showToast('Exclusion added');
-            document.getElementById('ssid-input').value = '';
-            document.getElementById('scan-results').classList.add('hidden');
-            htmx.ajax('GET', '/api/filters', '#static-exclusion-list');
+            showToast('Static exclusion added');
+            document.getElementById('static-ssid-input').value = '';
+            document.getElementById('static-scan-results').classList.add('hidden');
+            htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
     });
 }
+
+// --- Dynamic Exclusions (SSID-only, post-processing) ---
+
+function addDynamicExclusion() {
+    const ssid = document.getElementById('dynamic-ssid-input').value.trim();
+    if (!ssid) {
+        showToast('Please enter an SSID', true);
+        return;
+    }
+
+    // Determine if pattern (contains wildcards) or exact
+    const matchType = (ssid.includes('*') || ssid.includes('?')) ? 'pattern' : 'exact';
+
+    fetch('/api/filters/dynamic', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ssid: ssid,
+            match_type: matchType
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Dynamic exclusion added');
+            document.getElementById('dynamic-ssid-input').value = '';
+            htmx.ajax('GET', '/api/filters/dynamic', '#dynamic-exclusion-list');
+        } else {
+            showToast(data.error || 'Failed to add', true);
+        }
+    });
+}
+
+// --- Remove Filters ---
 
 function removeFilter(type, value) {
     if (!confirm('Remove this exclusion?')) return;
@@ -148,7 +168,12 @@ function removeFilter(type, value) {
         .then(data => {
             if (data.success) {
                 showToast('Removed');
-                htmx.ajax('GET', '/api/filters', '#static-exclusion-list');
+                // Refresh the appropriate list
+                if (type === 'static') {
+                    htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
+                } else {
+                    htmx.ajax('GET', '/api/filters/dynamic', '#dynamic-exclusion-list');
+                }
             } else {
                 showToast(data.error || 'Failed', true);
             }
@@ -262,22 +287,6 @@ document.addEventListener('keydown', e => {
     }
 });
 
-// === Filter Type Toggle ===
-
-document.addEventListener('DOMContentLoaded', () => {
-    document.querySelectorAll('input[name="exclusion-type"]').forEach(radio => {
-        radio.addEventListener('change', function() {
-            const hint = document.getElementById('type-hint');
-            if (this.value === 'static') {
-                hint.textContent = 'Static: Block at capture time. Use for home networks, neighbors.';
-                hint.classList.remove('dynamic');
-            } else {
-                hint.textContent = 'Dynamic: Post-process removal. Use for iPhone/Android hotspots with rotating MACs.';
-                hint.classList.add('dynamic');
-            }
-        });
-    });
-});
 
 // === HTMX Event Handlers ===
 
