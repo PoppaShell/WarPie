@@ -197,7 +197,7 @@ def api_status_html():
 def api_mode():
     """Switch capture mode.
 
-    Returns HTML partial for HTMX to swap into #status-panel.
+    Returns HTML with status panel and out-of-band mode buttons swap.
     """
     # Handle both JSON and form-encoded data (HTMX sends form-encoded by default)
     if request.is_json:
@@ -217,17 +217,42 @@ def api_mode():
     success = switch_mode(mode, target_lists)
 
     if success:
-        # Return updated status HTML for HTMX
+        # Return updated status HTML for HTMX with OOB swap for mode buttons
         running, current_mode = get_kismet_status()
-        return render_template(
+        active_mode = current_mode.lower() if running else ""
+
+        status_html = render_template(
             "partials/_status.html",
             status="Running" if running else "Stopped",
             status_class="status-running" if running else "status-stopped",
             current_mode=current_mode,
             uptime=get_uptime(),
         )
+
+        # Out-of-band swap for mode buttons to update active state
+        buttons_html = render_template(
+            "partials/_mode_buttons.html",
+            active_mode=active_mode,
+        )
+
+        # Wrap buttons in OOB swap container
+        oob_html = f'<div id="mode-buttons" hx-swap-oob="innerHTML">{buttons_html}</div>'
+
+        return status_html + oob_html
     else:
         return jsonify({"success": False, "error": "Failed to switch mode"}), 500
+
+
+@main_bp.route("/api/mode-buttons")
+def api_mode_buttons():
+    """Get mode buttons partial for HTMX refresh."""
+    running, current_mode = get_kismet_status()
+    active_mode = current_mode.lower() if running else ""
+
+    return render_template(
+        "partials/_mode_buttons.html",
+        active_mode=active_mode,
+    )
 
 
 @main_bp.route("/api/reboot", methods=["POST"])

@@ -13,6 +13,9 @@ EXCLUDE_SCRIPT = "/usr/local/bin/warpie-exclude-ssid.sh"
 FILTER_PROCESSOR_SCRIPT = "/usr/local/bin/warpie-filter-processor.py"
 TARGET_LISTS_CONFIG = "/etc/warpie/target_lists.conf"
 FILTER_RULES_CONFIG = "/etc/warpie/filter_rules.conf"
+KISMET_CONF_DIR = "/etc/kismet"
+KISMET_SITE_CONF = f"{KISMET_CONF_DIR}/kismet_site.conf"
+KISMET_WARDRIVE_CONF = f"{KISMET_CONF_DIR}/kismet_wardrive.conf"
 KISMET_LOG_DIR = str(Path.home() / "kismet" / "logs")
 
 # Capture modes

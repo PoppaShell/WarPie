@@ -157,6 +157,7 @@ body::before {
 }
 
 .mode-btn {
+    position: relative;
     background: var(--bg);
     border: 1px solid var(--border);
     color: var(--fg);
@@ -798,6 +799,59 @@ select option {
     display: inline-flex;
 }
 
+/* Mode button spinner - positioned within button */
+.mode-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(10, 10, 10, 0.9);
+    padding: 5px;
+}
+
+.mode-btn.htmx-request {
+    pointer-events: none;
+    opacity: 0.7;
+}
+
+.mode-btn.disabled {
+    pointer-events: none;
+    opacity: 0.4;
+    border-color: var(--fg-dim);
+}
+
+/* Unsaved Changes Banner */
+.unsaved-banner {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    margin-bottom: 15px;
+    border: 1px solid var(--warning);
+    background: rgba(255, 170, 0, 0.1);
+    animation: pulse-warning 1.5s ease-in-out infinite;
+}
+
+.unsaved-banner.hidden {
+    display: none;
+}
+
+.unsaved-text {
+    color: var(--warning);
+    font-size: calc(12px * var(--font-scale));
+    font-weight: bold;
+}
+
+.unsaved-actions {
+    display: flex;
+    gap: 8px;
+}
+
+@keyframes pulse-warning {
+    0%, 100% { box-shadow: 0 0 5px rgba(255, 170, 0, 0.3); }
+    50% { box-shadow: 0 0 15px rgba(255, 170, 0, 0.6); }
+}
+
 /* Tabs */
 .tabs,
 .view-toggle {
@@ -949,7 +1003,9 @@ select option {
     border: 1px solid var(--fg);
     padding: 8px 10px;
     font-size: calc(11px * var(--font-scale));
-    white-space: nowrap;
+    white-space: normal;
+    width: max-content;
+    max-width: 250px;
     z-index: 100;
     margin-bottom: 5px;
     text-align: left;
@@ -970,6 +1026,24 @@ select option {
     transform: translateX(-50%);
     border: 5px solid transparent;
     border-top-color: var(--fg);
+}
+
+/* Mobile tooltip adjustments */
+@media (max-width: 480px) {
+    .tooltip-content {
+        position: fixed;
+        bottom: auto;
+        top: 50%;
+        left: 50% !important;
+        right: auto !important;
+        transform: translate(-50%, -50%);
+        max-width: calc(100vw - 40px);
+        margin-bottom: 0;
+    }
+
+    .tooltip-content::after {
+        display: none;
+    }
 }
 
 /* Section description */

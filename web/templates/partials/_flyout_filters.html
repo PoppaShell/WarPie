@@ -84,17 +84,17 @@
 
     <!-- Actions Section -->
     <div class="filter-section">
-        <h3 class="section-title">ACTIONS</h3>
+        <h3 class="section-title">HISTORICAL LOGS</h3>
+        <p class="section-desc">Clean excluded networks from past captures before uploading.</p>
 
         <div class="btn-row">
-            <button class="btn"
+            <button class="btn btn-block"
                     hx-post="/api/filters/cleanup"
                     hx-confirm="Run retroactive cleanup? This will remove excluded networks from historical logs."
                     hx-indicator="#cleanup-spinner">
                 <span class="htmx-indicator" id="cleanup-spinner"><span class="spinner"></span></span>
-                CLEANUP
+                CLEAN HISTORICAL LOGS
             </button>
-            <button class="btn" onclick="openPreUpload()">PRE-UPLOAD</button>
         </div>
     </div>
 </div>

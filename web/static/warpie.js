@@ -4,6 +4,68 @@
  * This file only handles local UI state (flyouts, toasts).
  */
 
+// === Unsaved Changes State ===
+
+let hasUnsavedChanges = false;
+
+function markUnsavedChanges() {
+    hasUnsavedChanges = true;
+    updateUnsavedUI();
+}
+
+function clearUnsavedChanges() {
+    hasUnsavedChanges = false;
+    updateUnsavedUI();
+}
+
+function updateUnsavedUI() {
+    const banner = document.getElementById('unsaved-changes-banner');
+    const modeButtons = document.querySelectorAll('.mode-btn');
+
+    if (hasUnsavedChanges) {
+        // Show the unsaved changes banner
+        if (banner) banner.classList.remove('hidden');
+        // Gray out mode buttons
+        modeButtons.forEach(btn => {
+            btn.classList.add('disabled');
+            btn.setAttribute('data-original-onclick', btn.getAttribute('onclick') || '');
+            btn.removeAttribute('hx-post');
+        });
+    } else {
+        // Hide banner
+        if (banner) banner.classList.add('hidden');
+        // Restore mode buttons
+        modeButtons.forEach(btn => {
+            btn.classList.remove('disabled');
+        });
+    }
+}
+
+function applyChangesAndClose() {
+    // Call cleanup endpoint then clear state
+    fetch('/api/filters/cleanup', {method: 'POST'})
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                showToast('Changes applied');
+                clearUnsavedChanges();
+                // Refresh mode buttons to restore HTMX attrs
+                htmx.ajax('GET', '/api/mode-buttons', '#mode-buttons');
+            } else {
+                showToast(data.error || 'Failed to apply', true);
+            }
+        })
+        .catch(() => showToast('Failed to apply changes', true));
+}
+
+function discardChanges() {
+    if (confirm('Discard unsaved filter changes?')) {
+        clearUnsavedChanges();
+        // Refresh mode buttons
+        htmx.ajax('GET', '/api/mode-buttons', '#mode-buttons');
+    }
+}
+
 // === Font Size Controls ===
 
 const FONT_SCALE_MIN = 0.8;
@@ -166,7 +228,8 @@ function addSingleBSSID(bssid, ssid) {
     .then(data => {
         if (data.success) {
             showToast('Added ' + bssid);
-            htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
+            markUnsavedChanges();
+            htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -197,9 +260,10 @@ function addAllBSSIDs() {
     .then(data => {
         if (data.success) {
             showToast('Added ' + bssids.length + ' BSSIDs');
+            markUnsavedChanges();
             document.getElementById('static-ssid-input').value = '';
             document.getElementById('static-scan-results').classList.add('hidden');
-            htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
+            htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -230,8 +294,9 @@ function addDynamicExclusion() {
     .then(data => {
         if (data.success) {
             showToast('Dynamic exclusion added');
+            markUnsavedChanges();
             document.getElementById('dynamic-ssid-input').value = '';
-            htmx.ajax('GET', '/api/filters/dynamic', '#dynamic-exclusion-list');
+            htmx.ajax('GET', '/api/filters/dynamic?limit=5', '#dynamic-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -248,11 +313,12 @@ function removeFilter(type, value) {
         .then(data => {
             if (data.success) {
                 showToast('Removed');
+                markUnsavedChanges();
                 // Refresh the appropriate list
                 if (type === 'static') {
-                    htmx.ajax('GET', '/api/filters/static', '#static-exclusion-list');
+                    htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
                 } else {
-                    htmx.ajax('GET', '/api/filters/dynamic', '#dynamic-exclusion-list');
+                    htmx.ajax('GET', '/api/filters/dynamic?limit=5', '#dynamic-exclusion-list');
                 }
             } else {
                 showToast(data.error || 'Failed', true);
