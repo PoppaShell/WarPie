@@ -97,11 +97,20 @@ function scanSSID() {
         showToast('Please enter an SSID', true);
         return;
     }
-    htmx.ajax('GET', '/api/scan-ssid?ssid=' + encodeURIComponent(ssid), {
-        target: '#found-networks',
-        swap: 'innerHTML'
-    }).then(() => {
-        document.getElementById('scan-results').classList.remove('hidden');
+    // Show scanning state
+    document.getElementById('found-networks').innerHTML = '<div class="loading"><span class="spinner"></span> Scanning...</div>';
+    document.getElementById('scan-results').classList.remove('hidden');
+
+    // Use fetch instead of htmx.ajax to avoid global indicator triggering
+    fetch('/api/scan-ssid?ssid=' + encodeURIComponent(ssid), {
+        headers: {'HX-Request': 'true'}
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('found-networks').innerHTML = html;
+    })
+    .catch(err => {
+        document.getElementById('found-networks').innerHTML = '<div class="error-message">Scan failed: ' + err.message + '</div>';
     });
 }
 

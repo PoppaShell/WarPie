@@ -214,10 +214,14 @@ def api_scan_ssid():
 
     result = call_filter_script("--discover", ssid)
 
+    # Transform script output format to what templates expect
+    # Script returns: {"ssid": "...", "live": [...], "historical": [...]}
+    # Templates expect: networks list and error string
+    networks = result.get("live", [])
+    error = result.get("error", "")
+
     # Return HTML for HTMX requests (HTMX sends HX-Request: true header)
     if request.headers.get("HX-Request"):
-        networks = result.get("networks", [])
-        error = result.get("error", "")
         return render_template(
             "partials/_scan_results.html",
             networks=networks,
@@ -225,4 +229,4 @@ def api_scan_ssid():
             ssid=ssid,
         )
 
-    return jsonify(result)
+    return jsonify({"success": True, "networks": networks, "ssid": ssid})
