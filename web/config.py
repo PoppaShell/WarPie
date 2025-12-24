@@ -8,7 +8,7 @@ HOST = "0.0.0.0"
 THREADS = 2
 
 # Paths
-FILTER_MANAGER_SCRIPT = "/usr/local/bin/warpie-filter-manager.sh"
+FILTER_MANAGER_SCRIPT = "/usr/local/bin/warpie-filter-manager.py"
 EXCLUDE_SCRIPT = "/usr/local/bin/warpie-exclude-ssid.sh"
 FILTER_PROCESSOR_SCRIPT = "/usr/local/bin/warpie-filter-processor.py"
 TARGET_LISTS_CONFIG = "/etc/warpie/target_lists.conf"

@@ -20,14 +20,23 @@ def call_filter_script(*args) -> dict:
     Returns:
         Parsed JSON response from the script.
     """
-    # Use new filter manager if available, otherwise fall back to old script
-    script = FILTER_MANAGER_SCRIPT if Path(FILTER_MANAGER_SCRIPT).exists() else EXCLUDE_SCRIPT
+    # Use new Python filter manager if available, otherwise fall back to old script
+    if Path(FILTER_MANAGER_SCRIPT).exists():
+        # Python script - run with python3
+        cmd = ["sudo", "python3", FILTER_MANAGER_SCRIPT, "--json", *args]
+    elif Path(EXCLUDE_SCRIPT).exists():
+        # Legacy bash script
+        cmd = ["sudo", EXCLUDE_SCRIPT, "--json", *args]
+    else:
+        return {"success": False, "error": "No filter manager script found"}
 
     try:
-        cmd = ["sudo", script, "--json", *args]
         result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
         if result.stdout.strip():
             return json.loads(result.stdout)
+        # Check stderr for error messages
+        if result.stderr.strip():
+            return {"success": False, "error": result.stderr.strip()}
         return {"success": False, "error": "No output from script"}
     except json.JSONDecodeError:
         return {"success": False, "error": "Invalid JSON response"}
