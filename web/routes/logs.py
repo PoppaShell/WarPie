@@ -31,7 +31,13 @@ def _get_wigle_logs(lines: int) -> list[str]:
         output = [f"=== {latest.name} ==="]
         if result.stdout.strip():
             # Strip each line and filter out empty lines
-            output.extend([line.strip() for line in result.stdout.strip().split("\n") if line.strip()])
+            output.extend(
+                [
+                    line.strip()
+                    for line in result.stdout.strip().split("\n")
+                    if line.strip()
+                ]
+            )
         else:
             output.append("(empty)")
         return output
@@ -42,9 +48,14 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
     """Get journalctl logs for a unit."""
     result = subprocess.run(
         [
-            "journalctl", "-u", unit,
-            "-n", str(lines),
-            "--no-pager", "-o", output_format,
+            "journalctl",
+            "-u",
+            unit,
+            "-n",
+            str(lines),
+            "--no-pager",
+            "-o",
+            output_format,
         ],
         check=False,
         capture_output=True,
@@ -53,7 +64,9 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
     )
     if result.returncode == 0 and result.stdout.strip():
         # Strip each line and filter out empty lines
-        return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+        return [
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        ]
     return ["No log entries found"]
 
 
@@ -91,11 +104,13 @@ def api_logs():
 
     log_lines = get_logs(source, lines)
 
-    return jsonify({
-        "logs": log_lines,
-        "lines": len(log_lines),
-        "source": source,
-    })
+    return jsonify(
+        {
+            "logs": log_lines,
+            "lines": len(log_lines),
+            "source": source,
+        }
+    )
 
 
 @logs_bp.route("/logs/html")

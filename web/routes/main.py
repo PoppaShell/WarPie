@@ -172,11 +172,13 @@ def index():
 def api_status():
     """Get current system status as JSON."""
     running, mode = get_kismet_status()
-    return jsonify({
-        "running": running,
-        "mode": mode,
-        "uptime": get_uptime(),
-    })
+    return jsonify(
+        {
+            "running": running,
+            "mode": mode,
+            "uptime": get_uptime(),
+        }
+    )
 
 
 @main_bp.route("/api/status/html")
