@@ -7,9 +7,7 @@
     </div>
     <div class="target-list-actions">
         <button class="btn-small" onclick="editTargetList('{{ list.id }}', '{{ list.name }}')">EDIT</button>
-        {% if not list.builtin %}
         <button class="btn-small danger" onclick="deleteTargetList('{{ list.id }}')">[X]</button>
-        {% endif %}
     </div>
 </div>
 {% endfor %}

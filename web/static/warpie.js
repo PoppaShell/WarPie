@@ -118,6 +118,8 @@ function openTargetEditor(listId, listName) {
 
 function closeTargetEditor() {
     document.getElementById('target-editor-flyout').classList.remove('open');
+    // Refresh target lists to update OUI counts
+    htmx.ajax('GET', '/api/targets/lists?view=manage', '#target-lists');
 }
 
 // Static Exclusions Manager
@@ -429,7 +431,7 @@ function openCreateTargetList() {
     .then(data => {
         if (data.success) {
             showToast('Created: ' + name);
-            htmx.ajax('GET', '/api/targets/lists', '#target-lists');
+            htmx.ajax('GET', '/api/targets/lists?view=manage', '#target-lists');
         } else {
             showToast(data.error || 'Failed', true);
         }
@@ -448,7 +450,7 @@ function deleteTargetList(listId) {
         .then(data => {
             if (data.success) {
                 showToast('Deleted');
-                htmx.ajax('GET', '/api/targets/lists', '#target-lists');
+                htmx.ajax('GET', '/api/targets/lists?view=manage', '#target-lists');
             } else {
                 showToast(data.error || 'Failed', true);
             }
@@ -565,6 +567,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 // === HTMX Event Handlers ===
+
+// Instant highlight when mode button is clicked (before request completes)
+document.body.addEventListener('htmx:beforeRequest', function(evt) {
+    // Check if this is a mode button request
+    if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/api/mode') {
+        const clickedBtn = evt.detail.elt;
+        if (clickedBtn && clickedBtn.classList.contains('mode-btn')) {
+            // Remove active from all mode buttons, add to clicked one
+            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+            clickedBtn.classList.add('active');
+        }
+    }
+});
 
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     // Handle successful mode switch

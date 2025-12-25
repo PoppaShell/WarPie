@@ -37,11 +37,15 @@ def load_target_lists() -> dict[str, Any]:
         Dictionary of target lists by ID.
     """
     lists = dict(BUILTIN_LISTS)
+    hidden_lists: set[str] = set()
 
     config_path = Path(TARGET_LISTS_CONFIG)
     if config_path.exists():
         try:
             user_data = json.loads(config_path.read_text())
+
+            # Get hidden builtin lists
+            hidden_lists = set(user_data.get("hidden_lists", []))
 
             # Merge user-created lists
             for list_id, list_data in user_data.get("lists", {}).items():
@@ -56,22 +60,42 @@ def load_target_lists() -> dict[str, Any]:
         except (json.JSONDecodeError, KeyError):
             pass
 
+    # Remove hidden builtin lists from display
+    for hidden_id in hidden_lists:
+        if hidden_id in lists:
+            del lists[hidden_id]
+
     return lists
 
 
-def save_target_lists(lists: dict[str, Any]) -> bool:
+def save_target_lists(lists: dict[str, Any], hidden_lists: list[str] | None = None) -> bool:
     """Save target lists to config file.
 
     Args:
         lists: Dictionary of target lists.
+        hidden_lists: List of builtin list IDs to hide.
 
     Returns:
         True if save was successful.
     """
     config_path = Path(TARGET_LISTS_CONFIG)
 
+    # Load existing hidden_lists if not provided
+    existing_hidden: list[str] = []
+    if hidden_lists is None and config_path.exists():
+        try:
+            existing_data = json.loads(config_path.read_text())
+            existing_hidden = existing_data.get("hidden_lists", [])
+        except (json.JSONDecodeError, KeyError):
+            pass
+        hidden_lists = existing_hidden
+
     # Only save user-created lists and user-added OUIs
-    user_data = {"lists": {}}
+    user_data: dict[str, Any] = {"lists": {}}
+
+    # Add hidden_lists if any
+    if hidden_lists:
+        user_data["hidden_lists"] = hidden_lists
 
     for list_id, list_data in lists.items():
         if list_data.get("builtin"):
@@ -89,6 +113,40 @@ def save_target_lists(lists: dict[str, Any]) -> bool:
         return True
     except Exception:
         return False
+
+
+def get_hidden_lists() -> list[str]:
+    """Get list of hidden builtin list IDs.
+
+    Returns:
+        List of hidden list IDs.
+    """
+    config_path = Path(TARGET_LISTS_CONFIG)
+    if config_path.exists():
+        try:
+            user_data = json.loads(config_path.read_text())
+            return user_data.get("hidden_lists", [])
+        except (json.JSONDecodeError, KeyError):
+            pass
+    return []
+
+
+def hide_builtin_list(list_id: str) -> bool:
+    """Hide a builtin list by adding it to hidden_lists.
+
+    Args:
+        list_id: The builtin list ID to hide.
+
+    Returns:
+        True if successful.
+    """
+    hidden = get_hidden_lists()
+    if list_id not in hidden:
+        hidden.append(list_id)
+
+    # Load lists and save with updated hidden list
+    lists = load_target_lists()
+    return save_target_lists(lists, hidden)
 
 
 def get_target_lists_data() -> list[dict]:
@@ -219,14 +277,25 @@ def api_update_target_list(list_id: str):
 
 @targets_bp.route("/targets/lists/<list_id>", methods=["DELETE"])
 def api_delete_target_list(list_id: str):
-    """Delete a target list."""
+    """Delete a target list.
+
+    For builtin lists, this hides them from the UI.
+    For user-created lists, this removes them entirely.
+    """
+    # Check in BUILTIN_LISTS first to see if it's a builtin that might be hidden
+    is_builtin = list_id in BUILTIN_LISTS
+
     lists = load_target_lists()
 
-    if list_id not in lists:
+    if list_id not in lists and not is_builtin:
         return jsonify({"success": False, "error": "List not found"}), 404
 
-    if lists[list_id].get("builtin"):
-        return jsonify({"success": False, "error": "Cannot delete built-in list"}), 400
+    if is_builtin:
+        # Hide builtin list instead of deleting
+        if hide_builtin_list(list_id):
+            return jsonify({"success": True, "message": "List hidden"})
+        else:
+            return jsonify({"success": False, "error": "Failed to hide list"}), 500
 
     del lists[list_id]
 
