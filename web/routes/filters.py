@@ -31,9 +31,7 @@ def call_filter_script(*args) -> dict:
         return {"success": False, "error": "No filter manager script found"}
 
     try:
-        result = subprocess.run(
-            cmd, check=False, capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
         if result.stdout.strip():
             return json.loads(result.stdout)
         # Check stderr for error messages
@@ -62,9 +60,7 @@ def call_processor_script(*args) -> dict:
 
     try:
         cmd = ["python3", FILTER_PROCESSOR_SCRIPT, "--json", *args]
-        result = subprocess.run(
-            cmd, check=False, capture_output=True, text=True, timeout=60
-        )
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=60)
         if result.stdout.strip():
             return json.loads(result.stdout)
         return {"success": False, "error": "No output from processor"}
@@ -240,9 +236,7 @@ def api_remove_filter(filter_type: str, value: str):
     if phy not in ("wifi", "btle", "bt"):
         return jsonify({"success": False, "error": "Invalid PHY type"}), 400
 
-    result = call_filter_script(
-        f"--remove-{filter_type}", "--ssid", value, "--phy", phy
-    )
+    result = call_filter_script(f"--remove-{filter_type}", "--ssid", value, "--phy", phy)
     return jsonify(result)
 
 

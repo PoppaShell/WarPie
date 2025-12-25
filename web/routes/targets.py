@@ -71,9 +71,7 @@ def load_target_lists() -> dict[str, Any]:
     return lists
 
 
-def save_target_lists(
-    lists: dict[str, Any], hidden_lists: list[str] | None = None
-) -> bool:
+def save_target_lists(lists: dict[str, Any], hidden_lists: list[str] | None = None) -> bool:
     """Save target lists to config file.
 
     Args:
@@ -105,9 +103,7 @@ def save_target_lists(
     for list_id, list_data in lists.items():
         if list_data.get("builtin"):
             # For built-in lists, only save user-added OUIs
-            user_ouis = [
-                oui for oui in list_data.get("ouis", []) if not oui.get("builtin")
-            ]
+            user_ouis = [oui for oui in list_data.get("ouis", []) if not oui.get("builtin")]
             if user_ouis:
                 user_data["lists"][list_id] = {"ouis": user_ouis}
         else:
@@ -235,9 +231,7 @@ def api_create_target_list():
     }
 
     if save_target_lists(lists):
-        return jsonify(
-            {"success": True, "id": list_id, "message": f"Created list: {name}"}
-        )
+        return jsonify({"success": True, "id": list_id, "message": f"Created list: {name}"})
     else:
         return jsonify({"success": False, "error": "Failed to save list"}), 500
 
@@ -259,9 +253,7 @@ def api_get_target_list(list_id: str):
 
     # Return HTML for HTMX requests
     if request.headers.get("HX-Request"):
-        return render_template(
-            "partials/_oui_list.html", ouis=target_list.get("ouis", [])
-        )
+        return render_template("partials/_oui_list.html", ouis=target_list.get("ouis", []))
 
     return jsonify({"success": True, "list": target_list})
 
@@ -276,9 +268,7 @@ def api_update_target_list(list_id: str):
 
     if lists[list_id].get("builtin"):
         return (
-            jsonify(
-                {"success": False, "error": "Cannot modify built-in list metadata"}
-            ),
+            jsonify({"success": False, "error": "Cannot modify built-in list metadata"}),
             400,
         )
 
@@ -353,17 +343,14 @@ def api_add_oui(list_id: str):
     lists[list_id]["ouis"].append(
         {
             "oui": oui,
-            "description": description
-            or f"Added {datetime.now().strftime('%Y-%m-%d')}",
+            "description": description or f"Added {datetime.now().strftime('%Y-%m-%d')}",
             "builtin": False,
             "added_at": datetime.now().isoformat(),
         }
     )
 
     if save_target_lists(lists):
-        return jsonify(
-            {"success": True, "message": f"Added {oui} to {lists[list_id]['name']}"}
-        )
+        return jsonify({"success": True, "message": f"Added {oui} to {lists[list_id]['name']}"})
     else:
         return jsonify({"success": False, "error": "Failed to save changes"}), 500
 
@@ -390,9 +377,7 @@ def api_remove_oui(list_id: str, oui: str):
     if oui_found.get("builtin"):
         return jsonify({"success": False, "error": "Cannot remove built-in OUI"}), 400
 
-    lists[list_id]["ouis"] = [
-        o for o in lists[list_id]["ouis"] if o.get("oui") != oui_upper
-    ]
+    lists[list_id]["ouis"] = [o for o in lists[list_id]["ouis"] if o.get("oui") != oui_upper]
 
     if save_target_lists(lists):
         return jsonify({"success": True, "message": f"Removed {oui_upper}"})
