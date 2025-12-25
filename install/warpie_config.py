@@ -887,9 +887,10 @@ def main():  # noqa: PLR0912, PLR0915
         "targeted": "[cyan]Targeted[/cyan]",
     }
     if kismet_autostart:
+        mode_label = mode_labels.get(kismet_startup_mode, kismet_startup_mode)
         summary_table.add_row(
             "[bold]Kismet Auto-Start[/bold]",
-            f"[green]Enabled[/green] - {mode_labels.get(kismet_startup_mode, kismet_startup_mode)} mode",
+            f"[green]Enabled[/green] - {mode_label} mode",
         )
     else:
         summary_table.add_row(
