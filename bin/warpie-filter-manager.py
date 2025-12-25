@@ -6,9 +6,15 @@ Supports three filtering paradigms:
   2. Dynamic Exclusions - Post-process removal for rotating-MAC networks
   3. Targeting Inclusions - Add OUI prefixes to targeting modes
 
+Supports multiple PHY types:
+  - wifi: IEEE 802.11 WiFi networks (default)
+  - btle: Bluetooth Low Energy devices
+  - bt:   Classic Bluetooth devices
+
 Usage:
   Interactive:  ./warpie-filter-manager.py
   JSON API:     ./warpie-filter-manager.py --json --list
+  BTLE:         ./warpie-filter-manager.py --add-static --phy btle --bssid AA:BB:CC:DD:EE:FF
 """
 
 import json
@@ -36,6 +42,20 @@ SECTION_STATIC = "[static_exclusions]"
 SECTION_DYNAMIC = "[dynamic_exclusions]"
 SECTION_SMART = "[smart_mode_targets]"
 SECTION_TARGETS = "[targeting_inclusions]"
+SECTION_BTLE_STATIC = "[btle_static_exclusions]"
+SECTION_BTLE_DYNAMIC = "[btle_dynamic_exclusions]"
+SECTION_BT_STATIC = "[bt_static_exclusions]"
+SECTION_BT_DYNAMIC = "[bt_dynamic_exclusions]"
+
+# PHY type to Kismet PHY name mapping
+PHY_KISMET_NAMES = {
+    "wifi": "IEEE802.11",
+    "btle": "BTLE",
+    "bt": "Bluetooth",
+}
+
+# Valid PHY types
+VALID_PHY_TYPES = ("wifi", "btle", "bt")
 
 
 @dataclass
@@ -45,6 +65,7 @@ class FilterEntry:
     value: str
     type: str
     description: str = ""
+    phy: str = "wifi"  # wifi, btle, or bt
 
 
 @dataclass
@@ -61,9 +82,13 @@ class ScanResult:
 class FilterConfig:
     """The complete filter configuration."""
 
-    static_exclusions: list = field(default_factory=list)
-    dynamic_exclusions: list = field(default_factory=list)
+    static_exclusions: list = field(default_factory=list)  # WiFi static
+    dynamic_exclusions: list = field(default_factory=list)  # WiFi dynamic
     targeting_inclusions: list = field(default_factory=list)
+    btle_static_exclusions: list = field(default_factory=list)  # BTLE static
+    btle_dynamic_exclusions: list = field(default_factory=list)  # BTLE dynamic
+    bt_static_exclusions: list = field(default_factory=list)  # Classic BT static
+    bt_dynamic_exclusions: list = field(default_factory=list)  # Classic BT dynamic
 
 
 class FilterManager:
@@ -135,19 +160,43 @@ class FilterManager:
 # 2. DYNAMIC EXCLUSIONS: Rotating-MAC networks removed via post-processing
 # 3. TARGETING INCLUSIONS: OUI prefixes added to targeting modes
 #
+# Supports multiple PHY types:
+# - WiFi (IEEE 802.11) - default sections
+# - BTLE (Bluetooth Low Energy) - btle_* sections
+# - BT (Classic Bluetooth) - bt_* sections
+#
 # FORMAT: value|type|description
-# TYPES: exact, pattern, bssid, oui
+# TYPES: exact, pattern, bssid, oui, name (for BTLE device names)
 # PATTERNS: * = any characters, ? = single character
 
 [static_exclusions]
-# Networks with stable MACs - BSSIDs discovered and blocked at capture time
+# WiFi networks with stable MACs - BSSIDs discovered and blocked at capture time
 # HOME-5G|exact|Home 5GHz network
 # 74:83:C2:8A:23:4C|bssid|Home router MAC
 
 [dynamic_exclusions]
-# Networks with rotating MACs - only SSID stored, post-process removal
+# WiFi networks with rotating MACs - only SSID stored, post-process removal
 # PoppaShell|exact|Personal iPhone hotspot
 # iPhone*|pattern|Any iPhone hotspot
+
+[btle_static_exclusions]
+# BTLE devices with stable MACs - blocked at capture time
+# AA:BB:CC:DD:EE:FF|bssid|My Fitbit
+# Note: BTLE uses heavy MAC randomization, consider dynamic instead
+
+[btle_dynamic_exclusions]
+# BTLE devices with rotating MACs - removed by device name post-processing
+# Fitbit*|pattern|Any Fitbit device
+# My iPhone|exact|Personal iPhone (advertises via BTLE too)
+# Note: Device name = BTLE advertising name, similar to WiFi SSID
+
+[bt_static_exclusions]
+# Classic Bluetooth devices with stable MACs
+# AA:BB:CC:DD:EE:FF|bssid|Car audio system
+
+[bt_dynamic_exclusions]
+# Classic Bluetooth devices removed by name
+# CarPlay*|pattern|Any CarPlay device
 
 [smart_mode_targets]
 # Optional inverted filtering - ONLY capture these
@@ -180,6 +229,7 @@ class FilterManager:
 
         config = FilterConfig()
         current_section = ""
+        current_phy = "wifi"
 
         # First, load from the new filter_rules.conf
         if FILTER_RULES_FILE.exists():
@@ -187,21 +237,24 @@ class FilterManager:
             for line in content.splitlines():
                 line = line.strip()
 
-                # Section headers
-                if line == SECTION_STATIC:
-                    current_section = "static"
-                    continue
-                elif line == SECTION_DYNAMIC:
-                    current_section = "dynamic"
-                    continue
-                elif line == SECTION_SMART:
-                    current_section = "smart"
-                    continue
-                elif line == SECTION_TARGETS:
-                    current_section = "targets"
+                # Section headers - map section marker to (list_name, phy_type)
+                section_map = {
+                    SECTION_STATIC: ("static", "wifi"),
+                    SECTION_DYNAMIC: ("dynamic", "wifi"),
+                    SECTION_SMART: ("smart", "wifi"),
+                    SECTION_TARGETS: ("targets", "wifi"),
+                    SECTION_BTLE_STATIC: ("btle_static", "btle"),
+                    SECTION_BTLE_DYNAMIC: ("btle_dynamic", "btle"),
+                    SECTION_BT_STATIC: ("bt_static", "bt"),
+                    SECTION_BT_DYNAMIC: ("bt_dynamic", "bt"),
+                }
+
+                if line in section_map:
+                    current_section, current_phy = section_map[line]
                     continue
                 elif line.startswith("[") and line.endswith("]"):
                     current_section = ""
+                    current_phy = "wifi"
                     continue
 
                 # Skip comments and empty lines
@@ -215,6 +268,7 @@ class FilterManager:
                         value=parts[0],
                         type=parts[1],
                         description=parts[2] if len(parts) > 2 else "",
+                        phy=current_phy if current_section else "wifi",
                     )
 
                     if current_section == "static":
@@ -223,51 +277,92 @@ class FilterManager:
                         config.dynamic_exclusions.append(entry)
                     elif current_section == "targets":
                         config.targeting_inclusions.append(entry)
+                    elif current_section == "btle_static":
+                        config.btle_static_exclusions.append(entry)
+                    elif current_section == "btle_dynamic":
+                        config.btle_dynamic_exclusions.append(entry)
+                    elif current_section == "bt_static":
+                        config.bt_static_exclusions.append(entry)
+                    elif current_section == "bt_dynamic":
+                        config.bt_dynamic_exclusions.append(entry)
 
         # Also load legacy exclusions from Kismet config files
         # These were added by the installer directly to Kismet configs
-        seen_bssids = {e.value.upper() for e in config.static_exclusions if e.type == "bssid"}
+        # Track seen MACs per PHY type to avoid duplicates
+        seen_wifi_macs = {e.value.upper() for e in config.static_exclusions if e.type == "bssid"}
+        seen_btle_macs = {e.value.upper() for e in config.btle_static_exclusions if e.type == "bssid"}
+        seen_bt_macs = {e.value.upper() for e in config.bt_static_exclusions if e.type == "bssid"}
 
         for kismet_conf in [KISMET_SITE_CONF, KISMET_WARDRIVE_CONF]:
             if kismet_conf.exists():
                 try:
                     content = kismet_conf.read_text()
-                    ssid_context = ""
+                    filter_context = ""
                     for line in content.splitlines():
                         line = line.strip()
 
-                        # Check for WARPIE_FILTER comment with SSID context
+                        # Check for WARPIE_FILTER comment with context
                         if line.startswith("# WARPIE_FILTER:"):
-                            ssid_context = line.replace("# WARPIE_FILTER:", "").strip()
+                            filter_context = line.replace("# WARPIE_FILTER:", "").strip()
                             continue
 
                         # Check for home network exclusions comment
                         if "Home network exclusion" in line or "Home WiFi" in line:
-                            ssid_context = "Home Network"
+                            filter_context = "Home Network"
                             continue
 
-                        # Parse kis_log_device_filter lines
-                        if line.startswith("kis_log_device_filter=IEEE802.11,"):
-                            parts = line.split(",")
+                        # Parse kis_log_device_filter lines for all PHY types
+                        if line.startswith("kis_log_device_filter="):
+                            # Format: kis_log_device_filter=PHY,MAC,action
+                            # or: kis_log_device_filter=PHY,MAC/MASK,action
+                            filter_part = line.replace("kis_log_device_filter=", "")
+                            parts = filter_part.split(",")
                             if len(parts) >= 3 and parts[2] == "block":
+                                phy_name = parts[0]
                                 bssid_or_mask = parts[1]
-                                # Handle masked BSSIDs (00:XX:XX:XX:XX:XX/00:FF:FF:FF:FF:FF)
+                                # Handle masked addresses
                                 if "/" in bssid_or_mask:
-                                    bssid = bssid_or_mask.split("/")[0]
+                                    mac = bssid_or_mask.split("/")[0]
                                 else:
-                                    bssid = bssid_or_mask
+                                    mac = bssid_or_mask
 
-                                bssid_upper = bssid.upper()
-                                if bssid_upper not in seen_bssids:
-                                    seen_bssids.add(bssid_upper)
-                                    config.static_exclusions.append(
-                                        FilterEntry(
-                                            value=bssid,
-                                            type="bssid",
-                                            description=ssid_context if ssid_context else "Legacy Kismet filter",
+                                mac_upper = mac.upper()
+
+                                # Determine PHY type and add to appropriate list
+                                if phy_name == "IEEE802.11":
+                                    if mac_upper not in seen_wifi_macs:
+                                        seen_wifi_macs.add(mac_upper)
+                                        config.static_exclusions.append(
+                                            FilterEntry(
+                                                value=mac,
+                                                type="bssid",
+                                                description=filter_context or "Legacy Kismet filter",
+                                                phy="wifi",
+                                            )
                                         )
-                                    )
-                                ssid_context = ""
+                                elif phy_name == "BTLE":
+                                    if mac_upper not in seen_btle_macs:
+                                        seen_btle_macs.add(mac_upper)
+                                        config.btle_static_exclusions.append(
+                                            FilterEntry(
+                                                value=mac,
+                                                type="bssid",
+                                                description=filter_context or "Legacy Kismet BTLE filter",
+                                                phy="btle",
+                                            )
+                                        )
+                                elif phy_name == "Bluetooth":
+                                    if mac_upper not in seen_bt_macs:
+                                        seen_bt_macs.add(mac_upper)
+                                        config.bt_static_exclusions.append(
+                                            FilterEntry(
+                                                value=mac,
+                                                type="bssid",
+                                                description=filter_context or "Legacy Kismet BT filter",
+                                                phy="bt",
+                                            )
+                                        )
+                                filter_context = ""
                 except OSError:
                     pass
 
@@ -471,34 +566,54 @@ class FilterManager:
 
             return {}
 
-    def check_duplicate_static(self, value: str) -> bool:
+    def check_duplicate_static(self, value: str, phy: str = "wifi") -> bool:
         """Check if a static exclusion already exists (case-insensitive).
 
         Args:
             value: SSID or BSSID to check.
+            phy: PHY type (wifi, btle, bt).
 
         Returns:
             True if duplicate exists.
         """
         config = self.load_config()
         value_upper = value.upper()
-        for entry in config.static_exclusions:
+
+        # Get the appropriate list based on PHY type
+        if phy == "btle":
+            entries = config.btle_static_exclusions
+        elif phy == "bt":
+            entries = config.bt_static_exclusions
+        else:
+            entries = config.static_exclusions
+
+        for entry in entries:
             if entry.value.upper() == value_upper:
                 return True
         return False
 
-    def check_duplicate_dynamic(self, value: str) -> bool:
+    def check_duplicate_dynamic(self, value: str, phy: str = "wifi") -> bool:
         """Check if a dynamic exclusion already exists (case-insensitive).
 
         Args:
-            value: SSID to check.
+            value: SSID or device name to check.
+            phy: PHY type (wifi, btle, bt).
 
         Returns:
             True if duplicate exists.
         """
         config = self.load_config()
         value_upper = value.upper()
-        for entry in config.dynamic_exclusions:
+
+        # Get the appropriate list based on PHY type
+        if phy == "btle":
+            entries = config.btle_dynamic_exclusions
+        elif phy == "bt":
+            entries = config.bt_dynamic_exclusions
+        else:
+            entries = config.dynamic_exclusions
+
+        for entry in entries:
             if entry.value.upper() == value_upper:
                 return True
         return False
@@ -509,111 +624,145 @@ class FilterManager:
         match_type: str = "exact",
         description: str = "",
         bssids: str = "",
+        phy: str = "wifi",
     ) -> None:
         """Add a static exclusion.
 
         Args:
-            ssid: SSID or BSSID to exclude.
+            ssid: SSID/device name or MAC to exclude.
             match_type: One of exact, pattern, bssid.
             description: Optional description.
-            bssids: Comma-separated list of BSSIDs to also add.
+            bssids: Comma-separated list of MACs to also add.
+            phy: PHY type - wifi, btle, or bt.
         """
         self.ensure_config_dir()
 
         if not ssid:
-            self.json_error("SSID or BSSID required")
+            self.json_error("SSID/name or MAC required")
 
         if match_type not in ("exact", "pattern", "bssid"):
             self.json_error("Type must be: exact, pattern, or bssid")
 
+        if phy not in VALID_PHY_TYPES:
+            self.json_error(f"PHY must be: {', '.join(VALID_PHY_TYPES)}")
+
+        # Determine target section based on PHY type
+        section_map = {
+            "wifi": SECTION_STATIC,
+            "btle": SECTION_BTLE_STATIC,
+            "bt": SECTION_BT_STATIC,
+        }
+        target_section = section_map[phy]
+        phy_display = {"wifi": "WiFi", "btle": "BTLE", "bt": "Bluetooth"}[phy]
+
         # Check for duplicates (case-insensitive)
-        if self.check_duplicate_static(ssid):
-            self.json_error(f"'{ssid}' already exists in static exclusions")
+        if self.check_duplicate_static(ssid, phy):
+            self.json_error(f"'{ssid}' already exists in {phy_display} static exclusions")
             return
 
         # Add to config
         entry = f"{ssid}|{match_type}|{description}"
-        self.add_to_section(SECTION_STATIC, entry)
+        self.add_to_section(target_section, entry)
 
-        # If we have BSSIDs, also add them (skip duplicates)
-        added_bssids = []
+        # If we have MACs, also add them (skip duplicates)
+        added_macs = []
         if bssids:
-            for bssid in bssids.split(","):
-                bssid = bssid.strip()
-                if bssid and not self.check_duplicate_static(bssid):
-                    self.add_to_section(SECTION_STATIC, f"{bssid}|bssid|{description} BSSID")
-                    added_bssids.append(bssid)
+            for mac in bssids.split(","):
+                mac = mac.strip()
+                if mac and not self.check_duplicate_static(mac, phy):
+                    self.add_to_section(target_section, f"{mac}|bssid|{description} MAC")
+                    added_macs.append(mac)
 
         # Apply to Kismet configs
-        self.apply_static_filter(ssid, match_type, ",".join(added_bssids) if added_bssids else "")
+        self.apply_static_filter(ssid, match_type, ",".join(added_macs) if added_macs else "", phy)
 
-        self.json_success(f"Static exclusion added for '{ssid}'")
+        self.json_success(f"{phy_display} static exclusion added for '{ssid}'")
 
     def add_dynamic(
-        self, ssid: str, match_type: str = "exact", description: str = ""
+        self,
+        ssid: str,
+        match_type: str = "exact",
+        description: str = "",
+        phy: str = "wifi",
     ) -> None:
         """Add a dynamic exclusion.
 
         Args:
-            ssid: SSID to exclude.
+            ssid: SSID or device name to exclude.
             match_type: One of exact, pattern.
             description: Optional description.
+            phy: PHY type - wifi, btle, or bt.
         """
         self.ensure_config_dir()
 
         if not ssid:
-            self.json_error("SSID required")
+            self.json_error("SSID/name required")
 
         if match_type not in ("exact", "pattern"):
             self.json_error("Type must be: exact or pattern")
 
+        if phy not in VALID_PHY_TYPES:
+            self.json_error(f"PHY must be: {', '.join(VALID_PHY_TYPES)}")
+
+        # Determine target section based on PHY type
+        section_map = {
+            "wifi": SECTION_DYNAMIC,
+            "btle": SECTION_BTLE_DYNAMIC,
+            "bt": SECTION_BT_DYNAMIC,
+        }
+        target_section = section_map[phy]
+        phy_display = {"wifi": "WiFi", "btle": "BTLE", "bt": "Bluetooth"}[phy]
+
         # Check for duplicates (case-insensitive)
-        if self.check_duplicate_dynamic(ssid):
-            self.json_error(f"'{ssid}' already exists in dynamic exclusions")
+        if self.check_duplicate_dynamic(ssid, phy):
+            self.json_error(f"'{ssid}' already exists in {phy_display} dynamic exclusions")
             return
 
-        # Add to config - dynamic exclusions NEVER get BSSIDs
+        # Add to config - dynamic exclusions NEVER get MACs
         entry = f"{ssid}|{match_type}|{description}"
-        self.add_to_section(SECTION_DYNAMIC, entry)
+        self.add_to_section(target_section, entry)
 
-        self.log_warn("Dynamic exclusion added - will be processed post-capture")
-        self.json_success(f"Dynamic exclusion added for '{ssid}' (post-processing only)")
+        self.log_warn(f"{phy_display} dynamic exclusion added - will be processed post-capture")
+        self.json_success(f"{phy_display} dynamic exclusion added for '{ssid}' (post-processing only)")
 
     def apply_static_filter(
-        self, ssid: str, match_type: str, bssids: str = ""
+        self, ssid: str, match_type: str, macs: str = "", phy: str = "wifi"
     ) -> None:
         """Apply static filter to Kismet config files.
 
         Args:
-            ssid: SSID or BSSID.
+            ssid: SSID/name or MAC.
             match_type: Filter type.
-            bssids: Comma-separated BSSIDs.
+            macs: Comma-separated MACs.
+            phy: PHY type - wifi, btle, or bt.
         """
         configs = [KISMET_SITE_CONF, KISMET_WARDRIVE_CONF]
+        kismet_phy = PHY_KISMET_NAMES.get(phy, "IEEE802.11")
+        phy_display = {"wifi": "WiFi", "btle": "BTLE", "bt": "Bluetooth"}[phy]
 
         for config in configs:
             if not config.exists():
                 continue
 
-            marker = f"# WARPIE_FILTER: {ssid}"
+            marker = f"# WARPIE_FILTER ({phy_display}): {ssid}"
 
             if match_type == "bssid":
-                # Direct BSSID
-                upper_bssid = ssid.upper()
-                lines = f"{marker}\nkis_log_device_filter=IEEE802.11,{upper_bssid},block\n"
+                # Direct MAC address
+                upper_mac = ssid.upper()
+                lines = f"{marker}\nkis_log_device_filter={kismet_phy},{upper_mac},block\n"
                 subprocess.run(
                     ["sudo", "tee", "-a", str(config)],
                     input=lines.encode(),
                     capture_output=True,
                 )
-            elif bssids:
-                # Add discovered BSSIDs
+            elif macs:
+                # Add discovered MACs
                 lines = ""
-                for bssid in bssids.split(","):
-                    bssid = bssid.strip()
-                    if bssid:
-                        upper_bssid = bssid.upper()
-                        lines += f"{marker}\nkis_log_device_filter=IEEE802.11,{upper_bssid},block\n"
+                for mac in macs.split(","):
+                    mac = mac.strip()
+                    if mac:
+                        upper_mac = mac.upper()
+                        lines += f"{marker}\nkis_log_device_filter={kismet_phy},{upper_mac},block\n"
                 if lines:
                     subprocess.run(
                         ["sudo", "tee", "-a", str(config)],
@@ -622,7 +771,10 @@ class FilterManager:
                     )
             else:
                 # Just add a comment for later discovery
-                comment = f"{marker} (SSID-only, discover BSSIDs with --discover)\n"
+                if phy == "wifi":
+                    comment = f"{marker} (SSID-only, discover BSSIDs with --discover)\n"
+                else:
+                    comment = f"{marker} (name-only, dynamic exclusion recommended for {phy_display})\n"
                 subprocess.run(
                     ["sudo", "tee", "-a", str(config)],
                     input=comment.encode(),
@@ -631,13 +783,17 @@ class FilterManager:
 
         self.log_info("Kismet configurations updated")
 
-    def remove_static(self, value: str) -> None:
+    def remove_static(self, value: str, phy: str = "wifi") -> None:
         """Remove a static exclusion.
 
         Args:
-            value: The SSID or BSSID to remove.
+            value: The SSID/name or MAC to remove.
+            phy: PHY type - wifi, btle, or bt.
         """
         self.ensure_config_dir()
+
+        kismet_phy = PHY_KISMET_NAMES.get(phy, "IEEE802.11")
+        phy_display = {"wifi": "WiFi", "btle": "BTLE", "bt": "Bluetooth"}[phy]
 
         # Escape special characters for sed
         escaped_value = value.replace("*", "\\*").replace("/", "\\/").replace(":", "\\:")
@@ -653,32 +809,35 @@ class FilterManager:
         # and legacy kis_log_device_filter entries
         for config in [KISMET_SITE_CONF, KISMET_WARDRIVE_CONF]:
             if config.exists():
-                # Remove WARPIE_FILTER comment lines for this value
-                marker = f"# WARPIE_FILTER: {value}"
-                escaped_marker = marker.replace("*", "\\*").replace(":", "\\:")
+                # Remove WARPIE_FILTER comment lines for this value (both old and new format)
+                # Old format: # WARPIE_FILTER: value
+                # New format: # WARPIE_FILTER (PHY): value
+                for marker in [f"# WARPIE_FILTER: {value}", f"# WARPIE_FILTER ({phy_display}): {value}"]:
+                    escaped_marker = marker.replace("*", "\\*").replace(":", "\\:").replace("(", "\\(").replace(")", "\\)")
+                    subprocess.run(
+                        ["sudo", "sed", "-i", f"/{escaped_marker}/d", str(config)],
+                        check=False,
+                    )
+
+                # Remove kis_log_device_filter entries with this MAC for the specified PHY
+                mac_upper = value.upper().replace(":", "\\:")
                 subprocess.run(
-                    ["sudo", "sed", "-i", f"/{escaped_marker}/d", str(config)],
+                    ["sudo", "sed", "-i", f"/kis_log_device_filter={kismet_phy},{mac_upper}/d", str(config)],
                     check=False,
                 )
 
-                # Remove legacy kis_log_device_filter entries with this BSSID
-                # Match: kis_log_device_filter=IEEE802.11,XX:XX:XX:XX:XX:XX,block
-                # or: kis_log_device_filter=IEEE802.11,XX:XX:XX:XX:XX:XX/FF:FF:FF:FF:FF:FF,block
-                bssid_upper = value.upper().replace(":", "\\:")
-                subprocess.run(
-                    ["sudo", "sed", "-i", f"/kis_log_device_filter=IEEE802.11,{bssid_upper}/d", str(config)],
-                    check=False,
-                )
+        self.json_success(f"Removed {phy_display} static exclusion: {value}")
 
-        self.json_success(f"Removed static exclusion: {value}")
-
-    def remove_dynamic(self, value: str) -> None:
+    def remove_dynamic(self, value: str, phy: str = "wifi") -> None:
         """Remove a dynamic exclusion.
 
         Args:
-            value: The SSID to remove.
+            value: The SSID/name to remove.
+            phy: PHY type - wifi, btle, or bt.
         """
         self.ensure_config_dir()
+
+        phy_display = {"wifi": "WiFi", "btle": "BTLE", "bt": "Bluetooth"}[phy]
 
         # Escape special characters for sed
         escaped_value = value.replace("*", "\\*").replace("/", "\\/")
@@ -686,10 +845,10 @@ class FilterManager:
         # Remove from config file
         subprocess.run(
             ["sudo", "sed", "-i", f"/^{escaped_value}|/d", str(FILTER_RULES_FILE)],
-            check=True,
+            check=False,
         )
 
-        self.json_success(f"Removed dynamic exclusion: {value}")
+        self.json_success(f"Removed {phy_display} dynamic exclusion: {value}")
 
     def list_filters(self) -> dict:
         """List all filters.
@@ -701,21 +860,45 @@ class FilterManager:
 
         if self.json_mode:
             return {
+                # WiFi filters
                 "static_exclusions": [
-                    {"ssid": e.value, "type": e.type, "description": e.description}
+                    {"ssid": e.value, "type": e.type, "description": e.description, "phy": "wifi"}
                     for e in config.static_exclusions
                 ],
                 "dynamic_exclusions": [
-                    {"ssid": e.value, "type": e.type, "description": e.description}
+                    {"ssid": e.value, "type": e.type, "description": e.description, "phy": "wifi"}
                     for e in config.dynamic_exclusions
                 ],
+                # BTLE filters
+                "btle_static_exclusions": [
+                    {"value": e.value, "type": e.type, "description": e.description, "phy": "btle"}
+                    for e in config.btle_static_exclusions
+                ],
+                "btle_dynamic_exclusions": [
+                    {"value": e.value, "type": e.type, "description": e.description, "phy": "btle"}
+                    for e in config.btle_dynamic_exclusions
+                ],
+                # Classic Bluetooth filters
+                "bt_static_exclusions": [
+                    {"value": e.value, "type": e.type, "description": e.description, "phy": "bt"}
+                    for e in config.bt_static_exclusions
+                ],
+                "bt_dynamic_exclusions": [
+                    {"value": e.value, "type": e.type, "description": e.description, "phy": "bt"}
+                    for e in config.bt_dynamic_exclusions
+                ],
+                # Targeting
                 "targeting_inclusions": [
                     {"oui": e.value, "mode": e.type, "description": e.description}
                     for e in config.targeting_inclusions
                 ],
                 "counts": {
-                    "static": len(config.static_exclusions),
-                    "dynamic": len(config.dynamic_exclusions),
+                    "wifi_static": len(config.static_exclusions),
+                    "wifi_dynamic": len(config.dynamic_exclusions),
+                    "btle_static": len(config.btle_static_exclusions),
+                    "btle_dynamic": len(config.btle_dynamic_exclusions),
+                    "bt_static": len(config.bt_static_exclusions),
+                    "bt_dynamic": len(config.bt_dynamic_exclusions),
                     "targets": len(config.targeting_inclusions),
                 },
             }
@@ -723,9 +906,10 @@ class FilterManager:
             print()
             print("\033[1m=== WarPie Network Filters ===\033[0m")
 
+            # WiFi Static
             print()
-            print("\033[0;36mStatic Exclusions\033[0m (blocked at capture time):")
-            print("-" * 45)
+            print("\033[0;36mWiFi Static Exclusions\033[0m (blocked at capture time):")
+            print("-" * 50)
             if not config.static_exclusions:
                 print("  (none configured)")
             else:
@@ -734,9 +918,10 @@ class FilterManager:
                     if e.description:
                         print(f"    {e.description}")
 
+            # WiFi Dynamic
             print()
-            print("\033[0;36mDynamic Exclusions\033[0m (post-processing removal):")
-            print("-" * 46)
+            print("\033[0;36mWiFi Dynamic Exclusions\033[0m (post-processing removal):")
+            print("-" * 52)
             if not config.dynamic_exclusions:
                 print("  (none configured)")
             else:
@@ -745,6 +930,55 @@ class FilterManager:
                     if e.description:
                         print(f"    {e.description}")
 
+            # BTLE Static
+            print()
+            print("\033[0;35mBTLE Static Exclusions\033[0m (blocked at capture time):")
+            print("-" * 50)
+            if not config.btle_static_exclusions:
+                print("  (none configured)")
+            else:
+                for e in config.btle_static_exclusions:
+                    print(f"  \033[0;35m*\033[0m {e.value} \033[1;33m[{e.type}]\033[0m")
+                    if e.description:
+                        print(f"    {e.description}")
+
+            # BTLE Dynamic
+            print()
+            print("\033[0;35mBTLE Dynamic Exclusions\033[0m (post-processing by device name):")
+            print("-" * 58)
+            if not config.btle_dynamic_exclusions:
+                print("  (none configured)")
+            else:
+                for e in config.btle_dynamic_exclusions:
+                    print(f"  \033[0;35m*\033[0m {e.value} \033[1;33m[{e.type}]\033[0m")
+                    if e.description:
+                        print(f"    {e.description}")
+
+            # Classic BT Static
+            print()
+            print("\033[0;34mBluetooth Static Exclusions\033[0m (blocked at capture time):")
+            print("-" * 55)
+            if not config.bt_static_exclusions:
+                print("  (none configured)")
+            else:
+                for e in config.bt_static_exclusions:
+                    print(f"  \033[0;34m*\033[0m {e.value} \033[1;33m[{e.type}]\033[0m")
+                    if e.description:
+                        print(f"    {e.description}")
+
+            # Classic BT Dynamic
+            print()
+            print("\033[0;34mBluetooth Dynamic Exclusions\033[0m (post-processing by name):")
+            print("-" * 56)
+            if not config.bt_dynamic_exclusions:
+                print("  (none configured)")
+            else:
+                for e in config.bt_dynamic_exclusions:
+                    print(f"  \033[0;34m*\033[0m {e.value} \033[1;33m[{e.type}]\033[0m")
+                    if e.description:
+                        print(f"    {e.description}")
+
+            # Targeting
             print()
             print("\033[0;36mTargeting Inclusions\033[0m (added to targeting modes):")
             print("-" * 48)
@@ -798,11 +1032,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Add home network (static, stable MAC)
+  # Add home WiFi network (static, stable MAC)
   %(prog)s --add-static --ssid "HOME-5G" --desc "Home network"
 
   # Add iPhone hotspot (dynamic, rotating MAC)
   %(prog)s --add-dynamic --ssid "iPhone*" --type pattern --desc "iPhone hotspots"
+
+  # Add BTLE device by MAC (static)
+  %(prog)s --add-static --phy btle --bssid AA:BB:CC:DD:EE:FF --desc "My Fitbit"
+
+  # Add BTLE device by name pattern (dynamic - recommended for BTLE)
+  %(prog)s --add-dynamic --phy btle --ssid "Fitbit*" --type pattern --desc "Fitbit devices"
 
   # JSON API for web interface
   %(prog)s --json --list
@@ -828,7 +1068,7 @@ Examples:
     parser.add_argument(
         "--remove-dynamic", action="store_true", help="Remove dynamic exclusion"
     )
-    parser.add_argument("--discover", metavar="SSID", help="Discover BSSIDs for an SSID")
+    parser.add_argument("--discover", metavar="SSID", help="Discover BSSIDs for an SSID (WiFi only)")
     parser.add_argument(
         "--cleanup", action="store_true", help="Run retroactive cleanup"
     )
@@ -839,8 +1079,8 @@ Examples:
     )
 
     # Parameters
-    parser.add_argument("--ssid", help="SSID for exclusion")
-    parser.add_argument("--bssid", help="BSSID for exclusion")
+    parser.add_argument("--ssid", help="SSID or device name for exclusion")
+    parser.add_argument("--bssid", help="BSSID/MAC address for exclusion")
     parser.add_argument(
         "--type",
         choices=["exact", "pattern", "bssid"],
@@ -848,6 +1088,12 @@ Examples:
         help="Match type (default: exact)",
     )
     parser.add_argument("--desc", "--description", dest="desc", help="Description")
+    parser.add_argument(
+        "--phy",
+        choices=["wifi", "btle", "bt"],
+        default="wifi",
+        help="PHY type: wifi (default), btle (Bluetooth Low Energy), bt (Classic Bluetooth)",
+    )
 
     parser.add_argument(
         "--version", "-v", action="version", version=f"WarPie Filter Manager v{VERSION}"
@@ -865,28 +1111,30 @@ Examples:
 
         elif args.add_static:
             if args.bssid:
-                manager.add_static(args.bssid, "bssid", args.desc or "")
+                manager.add_static(args.bssid, "bssid", args.desc or "", phy=args.phy)
             elif args.ssid:
-                manager.add_static(args.ssid, args.type, args.desc or "")
+                manager.add_static(args.ssid, args.type, args.desc or "", phy=args.phy)
             else:
-                manager.json_error("SSID or BSSID required")
+                manager.json_error("SSID/name or BSSID/MAC required")
 
         elif args.add_dynamic:
             if not args.ssid:
-                manager.json_error("SSID required")
-            manager.add_dynamic(args.ssid, args.type, args.desc or "")
+                manager.json_error("SSID/name required")
+            manager.add_dynamic(args.ssid, args.type, args.desc or "", phy=args.phy)
 
         elif args.remove_static:
             if not args.ssid:
-                manager.json_error("SSID required")
-            manager.remove_static(args.ssid)
+                manager.json_error("SSID/name required")
+            manager.remove_static(args.ssid, phy=args.phy)
 
         elif args.remove_dynamic:
             if not args.ssid:
-                manager.json_error("SSID required")
-            manager.remove_dynamic(args.ssid)
+                manager.json_error("SSID/name required")
+            manager.remove_dynamic(args.ssid, phy=args.phy)
 
         elif args.discover:
+            if args.phy != "wifi":
+                manager.log_warn("Discovery is only supported for WiFi. BTLE/BT devices must be added by MAC or name.")
             result = manager.discover_ssid(args.discover)
             if args.json and result:
                 manager.json_output(result)

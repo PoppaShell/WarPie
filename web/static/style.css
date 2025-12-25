@@ -548,6 +548,44 @@ select option {
     color: var(--fg);
 }
 
+/* PHY Type Selector */
+.phy-selector {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.phy-btn {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--fg-dim);
+    padding: 5px 12px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: calc(11px * var(--font-scale));
+    transition: all 0.1s ease;
+}
+
+.phy-btn:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+}
+
+.phy-btn.active {
+    border-color: var(--fg-bright);
+    color: var(--fg-bright);
+    background: rgba(0, 255, 0, 0.1);
+}
+
+/* Direct MAC Form (for BTLE/BT) */
+.direct-mac-form {
+    margin-top: 10px;
+}
+
+.direct-mac-form .input {
+    margin-top: 8px;
+}
+
 /* Filter/Exclusion List */
 .exclusion-list,
 .exclusion-list-container {

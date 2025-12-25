@@ -173,6 +173,90 @@ function refreshLogs() {
 
 // === Filter UI ===
 
+// PHY type state
+let currentStaticPhy = 'wifi';
+let currentDynamicPhy = 'wifi';
+
+function setStaticPhy(phy) {
+    currentStaticPhy = phy;
+    // Update button states
+    document.querySelectorAll('#static-phy-selector .phy-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.phy === phy);
+    });
+    // Show/hide appropriate input forms
+    const scanForm = document.querySelector('#static-ssid-input').parentElement;
+    const directMacForm = document.getElementById('static-direct-mac-form');
+    if (phy === 'wifi') {
+        scanForm.classList.remove('hidden');
+        directMacForm.classList.add('hidden');
+    } else {
+        // BTLE/BT: show direct MAC form, hide scan (can't scan for BT easily)
+        scanForm.classList.add('hidden');
+        directMacForm.classList.remove('hidden');
+    }
+    // Refresh list with PHY filter
+    htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + phy, '#static-exclusion-list');
+}
+
+function setDynamicPhy(phy) {
+    currentDynamicPhy = phy;
+    // Update button states
+    document.querySelectorAll('#dynamic-phy-selector .phy-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.phy === phy);
+    });
+    // Update placeholder based on PHY type
+    const input = document.getElementById('dynamic-ssid-input');
+    if (phy === 'wifi') {
+        input.placeholder = 'SSID or pattern (* = wildcard)';
+    } else if (phy === 'btle') {
+        input.placeholder = 'Device name or pattern (* = wildcard)';
+    } else {
+        input.placeholder = 'Bluetooth name or pattern (* = wildcard)';
+    }
+    // Refresh list with PHY filter
+    htmx.ajax('GET', '/api/filters/dynamic?limit=5&phy=' + phy, '#dynamic-exclusion-list');
+}
+
+function addDirectMAC() {
+    const mac = document.getElementById('static-mac-input').value.trim();
+    const desc = document.getElementById('static-desc-input').value.trim();
+
+    if (!mac) {
+        showToast('Please enter a MAC address', true);
+        return;
+    }
+
+    // Basic MAC format validation
+    const macRegex = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
+    if (!macRegex.test(mac)) {
+        showToast('Invalid MAC format. Use AA:BB:CC:11:22:33', true);
+        return;
+    }
+
+    fetch('/api/filters/static', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            ssid: mac,
+            match_type: 'bssid',
+            description: desc,
+            phy: currentStaticPhy
+        })
+    })
+    .then(r => r.json())
+    .then(data => {
+        if (data.success) {
+            showToast('Added ' + mac + (desc ? ' (' + desc + ')' : ''));
+            markUnsavedChanges();
+            document.getElementById('static-mac-input').value = '';
+            document.getElementById('static-desc-input').value = '';
+            htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + currentStaticPhy, '#static-exclusion-list');
+        } else {
+            showToast(data.error || 'Failed to add', true);
+        }
+    });
+}
+
 // --- Static Exclusions (scan-based, BSSID blocking) ---
 
 function scanForStatic() {
@@ -205,7 +289,8 @@ function addSingleBSSID(bssid, ssid) {
         body: JSON.stringify({
             ssid: bssid,
             match_type: 'bssid',
-            description: 'SSID: ' + ssid
+            description: 'SSID: ' + ssid,
+            phy: currentStaticPhy
         })
     })
     .then(r => r.json())
@@ -213,7 +298,7 @@ function addSingleBSSID(bssid, ssid) {
         if (data.success) {
             showToast('Added ' + bssid);
             markUnsavedChanges();
-            htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
+            htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + currentStaticPhy, '#static-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -237,7 +322,8 @@ function addAllBSSIDs() {
             ssid: ssid,
             match_type: 'bssid',
             bssids: bssids.join(','),
-            description: 'SSID: ' + ssid
+            description: 'SSID: ' + ssid,
+            phy: currentStaticPhy
         })
     })
     .then(r => r.json())
@@ -247,7 +333,7 @@ function addAllBSSIDs() {
             markUnsavedChanges();
             document.getElementById('static-ssid-input').value = '';
             document.getElementById('static-scan-results').classList.add('hidden');
-            htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
+            htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + currentStaticPhy, '#static-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -258,6 +344,7 @@ function addAllBSSIDs() {
 
 function addDynamicExclusion() {
     const ssid = document.getElementById('dynamic-ssid-input').value.trim();
+    const desc = document.getElementById('dynamic-desc-input').value.trim();
     if (!ssid) {
         showToast('Please enter an SSID', true);
         return;
@@ -271,7 +358,9 @@ function addDynamicExclusion() {
         headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({
             ssid: ssid,
-            match_type: matchType
+            match_type: matchType,
+            description: desc,
+            phy: currentDynamicPhy
         })
     })
     .then(r => r.json())
@@ -280,7 +369,8 @@ function addDynamicExclusion() {
             showToast('Dynamic exclusion added');
             markUnsavedChanges();
             document.getElementById('dynamic-ssid-input').value = '';
-            htmx.ajax('GET', '/api/filters/dynamic?limit=5', '#dynamic-exclusion-list');
+            document.getElementById('dynamic-desc-input').value = '';
+            htmx.ajax('GET', '/api/filters/dynamic?limit=5&phy=' + currentDynamicPhy, '#dynamic-exclusion-list');
         } else {
             showToast(data.error || 'Failed to add', true);
         }
@@ -289,20 +379,22 @@ function addDynamicExclusion() {
 
 // --- Remove Filters ---
 
-function removeFilter(type, value) {
+function removeFilter(type, value, phy) {
     if (!confirm('Remove this exclusion?')) return;
 
-    fetch('/api/filters/' + type + '/' + encodeURIComponent(value), {method: 'DELETE'})
+    const phyParam = phy ? '?phy=' + phy : '';
+    fetch('/api/filters/' + type + '/' + encodeURIComponent(value) + phyParam, {method: 'DELETE'})
         .then(r => r.json())
         .then(data => {
             if (data.success) {
                 showToast('Removed');
                 markUnsavedChanges();
                 // Refresh the appropriate list
+                const currentPhy = type === 'static' ? currentStaticPhy : currentDynamicPhy;
                 if (type === 'static') {
-                    htmx.ajax('GET', '/api/filters/static?limit=5', '#static-exclusion-list');
+                    htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + currentPhy, '#static-exclusion-list');
                 } else {
-                    htmx.ajax('GET', '/api/filters/dynamic?limit=5', '#dynamic-exclusion-list');
+                    htmx.ajax('GET', '/api/filters/dynamic?limit=5&phy=' + currentPhy, '#dynamic-exclusion-list');
                 }
             } else {
                 showToast(data.error || 'Failed', true);

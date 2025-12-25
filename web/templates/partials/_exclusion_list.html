@@ -8,7 +8,7 @@
         {% endif %}
     </div>
     <span class="exclusion-type">[{{ item.type|upper }}]</span>
-    <button class="btn-remove" onclick="removeFilter('{{ exclusion_type }}', '{{ item.ssid or item.value }}')">[X]</button>
+    <button class="btn-remove" onclick="removeFilter('{{ exclusion_type }}', '{{ item.ssid or item.value }}', '{{ phy }}')">[X]</button>
 </div>
 {% endfor %}
 {% else %}

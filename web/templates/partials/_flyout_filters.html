@@ -20,9 +20,25 @@
 
         <!-- Static Add Form - Needs Scan -->
         <div class="add-form">
+            <!-- PHY Type Selector -->
+            <div class="phy-selector" id="static-phy-selector">
+                <button class="phy-btn active" data-phy="wifi" onclick="setStaticPhy('wifi')">WIFI</button>
+                <button class="phy-btn" data-phy="btle" onclick="setStaticPhy('btle')">BTLE</button>
+                <button class="phy-btn" data-phy="bt" onclick="setStaticPhy('bt')">BT</button>
+            </div>
+
             <div class="input-row">
                 <input type="text" id="static-ssid-input" class="input" placeholder="Enter SSID to scan...">
                 <button class="btn" onclick="scanForStatic()">SCAN</button>
+            </div>
+
+            <!-- Direct MAC input for BTLE/BT (hidden by default) -->
+            <div class="direct-mac-form hidden" id="static-direct-mac-form">
+                <div class="input-row">
+                    <input type="text" id="static-mac-input" class="input" placeholder="MAC address (AA:BB:CC:11:22:33)">
+                    <button class="btn" onclick="addDirectMAC()">ADD</button>
+                </div>
+                <input type="text" id="static-desc-input" class="input" placeholder="Description (e.g., My Apple Watch)">
             </div>
 
             <!-- Scan Results (hidden by default) -->
@@ -54,10 +70,18 @@
 
         <!-- Dynamic Add Form - No Scan Needed -->
         <div class="add-form">
+            <!-- PHY Type Selector -->
+            <div class="phy-selector" id="dynamic-phy-selector">
+                <button class="phy-btn active" data-phy="wifi" onclick="setDynamicPhy('wifi')">WIFI</button>
+                <button class="phy-btn" data-phy="btle" onclick="setDynamicPhy('btle')">BTLE</button>
+                <button class="phy-btn" data-phy="bt" onclick="setDynamicPhy('bt')">BT</button>
+            </div>
+
             <div class="input-row">
                 <input type="text" id="dynamic-ssid-input" class="input" placeholder="SSID or pattern (* = wildcard)">
                 <button class="btn" onclick="addDynamicExclusion()">ADD</button>
             </div>
+            <input type="text" id="dynamic-desc-input" class="input" placeholder="Description (optional)">
         </div>
 
         <!-- Recent Dynamic Exclusions -->

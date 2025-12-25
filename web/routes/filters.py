@@ -81,10 +81,22 @@ def api_list_filters():
 
 @filters_bp.route("/filters/static")
 def api_list_static():
-    """List static exclusions only."""
-    result = call_filter_script("--list")
+    """List static exclusions only.
 
-    static = result.get("static_exclusions", [])
+    Query params:
+        phy: PHY type (wifi, btle, bt) - defaults to wifi
+        limit: Maximum entries to return
+    """
+    result = call_filter_script("--list")
+    phy = request.args.get("phy", "wifi")
+
+    # Get the appropriate list based on PHY type
+    if phy == "btle":
+        static = result.get("btle_static_exclusions", [])
+    elif phy == "bt":
+        static = result.get("bt_static_exclusions", [])
+    else:
+        static = result.get("static_exclusions", [])
 
     # Apply limit if specified
     limit = request.args.get("limit", type=int)
@@ -97,17 +109,30 @@ def api_list_static():
             "partials/_exclusion_list.html",
             exclusions=static,
             exclusion_type="static",
+            phy=phy,
         )
 
-    return jsonify({"success": True, "static_exclusions": static})
+    return jsonify({"success": True, "static_exclusions": static, "phy": phy})
 
 
 @filters_bp.route("/filters/dynamic")
 def api_list_dynamic():
-    """List dynamic exclusions only."""
-    result = call_filter_script("--list")
+    """List dynamic exclusions only.
 
-    dynamic = result.get("dynamic_exclusions", [])
+    Query params:
+        phy: PHY type (wifi, btle, bt) - defaults to wifi
+        limit: Maximum entries to return
+    """
+    result = call_filter_script("--list")
+    phy = request.args.get("phy", "wifi")
+
+    # Get the appropriate list based on PHY type
+    if phy == "btle":
+        dynamic = result.get("btle_dynamic_exclusions", [])
+    elif phy == "bt":
+        dynamic = result.get("bt_dynamic_exclusions", [])
+    else:
+        dynamic = result.get("dynamic_exclusions", [])
 
     # Apply limit if specified
     limit = request.args.get("limit", type=int)
@@ -120,50 +145,74 @@ def api_list_dynamic():
             "partials/_exclusion_list.html",
             exclusions=dynamic,
             exclusion_type="dynamic",
+            phy=phy,
         )
 
-    return jsonify({"success": True, "dynamic_exclusions": dynamic})
+    return jsonify({"success": True, "dynamic_exclusions": dynamic, "phy": phy})
 
 
 @filters_bp.route("/filters/static", methods=["POST"])
 def api_add_static():
-    """Add a static exclusion (BSSID-based, blocked at capture time)."""
+    """Add a static exclusion (MAC-based, blocked at capture time).
+
+    JSON body:
+        ssid: SSID/name or MAC address
+        match_type: exact, pattern, or bssid
+        bssids: Comma-separated additional MACs
+        description: Optional description
+        phy: wifi (default), btle, or bt
+    """
     data = request.get_json() or {}
     ssid = data.get("ssid", "")
     match_type = data.get("match_type", "exact")
     bssids = data.get("bssids", "")
     desc = data.get("description", "")
+    phy = data.get("phy", "wifi")
 
     if not ssid:
-        return jsonify({"success": False, "error": "SSID required"}), 400
+        return jsonify({"success": False, "error": "SSID/name required"}), 400
 
-    args = ["--add-static", "--ssid", ssid, "--type", match_type]
+    if phy not in ("wifi", "btle", "bt"):
+        return jsonify({"success": False, "error": "Invalid PHY type"}), 400
+
+    args = ["--add-static", "--ssid", ssid, "--type", match_type, "--phy", phy]
     if desc:
         args.extend(["--desc", desc])
     result = call_filter_script(*args)
 
-    # If BSSIDs provided, also add them
+    # If additional MACs provided, also add them
     if bssids and result.get("success"):
         for bssid in bssids.split(","):
             bssid_clean = bssid.strip()
             if bssid_clean:
-                call_filter_script("--add-static", "--bssid", bssid_clean)
+                call_filter_script("--add-static", "--bssid", bssid_clean, "--phy", phy)
 
     return jsonify(result)
 
 
 @filters_bp.route("/filters/dynamic", methods=["POST"])
 def api_add_dynamic():
-    """Add a dynamic exclusion (SSID-only, post-processing removal)."""
+    """Add a dynamic exclusion (name-only, post-processing removal).
+
+    JSON body:
+        ssid: SSID or device name
+        match_type: exact or pattern
+        description: Optional description
+        phy: wifi (default), btle, or bt
+    """
     data = request.get_json() or {}
     ssid = data.get("ssid", "")
     match_type = data.get("match_type", "exact")
     desc = data.get("description", "")
+    phy = data.get("phy", "wifi")
 
     if not ssid:
-        return jsonify({"success": False, "error": "SSID required"}), 400
+        return jsonify({"success": False, "error": "SSID/name required"}), 400
 
-    args = ["--add-dynamic", "--ssid", ssid, "--type", match_type]
+    if phy not in ("wifi", "btle", "bt"):
+        return jsonify({"success": False, "error": "Invalid PHY type"}), 400
+
+    args = ["--add-dynamic", "--ssid", ssid, "--type", match_type, "--phy", phy]
     if desc:
         args.extend(["--desc", desc])
     return jsonify(call_filter_script(*args))
@@ -175,12 +224,19 @@ def api_remove_filter(filter_type: str, value: str):
 
     Args:
         filter_type: Either 'static' or 'dynamic'.
-        value: The SSID or BSSID to remove.
+        value: The SSID/name or MAC to remove.
+
+    Query params:
+        phy: wifi (default), btle, or bt
     """
     if filter_type not in ["static", "dynamic"]:
         return jsonify({"success": False, "error": "Invalid filter type"}), 400
 
-    result = call_filter_script(f"--remove-{filter_type}", "--ssid", value)
+    phy = request.args.get("phy", "wifi")
+    if phy not in ("wifi", "btle", "bt"):
+        return jsonify({"success": False, "error": "Invalid PHY type"}), 400
+
+    result = call_filter_script(f"--remove-{filter_type}", "--ssid", value, "--phy", phy)
     return jsonify(result)
 
 
