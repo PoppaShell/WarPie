@@ -33,15 +33,7 @@ A complete wardriving and wireless research platform for Raspberry Pi OS, featur
 
 ## Quick Start
 
-### Option 1: Clone and Install
-
-```bash
-git clone https://github.com/PoppaShell/WarPie.git
-cd WarPie
-sudo ./install/install.sh
-```
-
-### Option 2: Release Tarball (Recommended)
+### Option 1: Release Tarball (Recommended)
 
 ```bash
 # Download and extract latest release
@@ -51,7 +43,17 @@ cd warpie-${VERSION}
 sudo ./install/install.sh
 ```
 
-This method downloads only the runtime files (~128KB) without development tooling.
+This downloads only runtime files (~128KB) - no dev tooling, tests, or node_modules.
+
+### Option 2: Clone Repository
+
+```bash
+git clone https://github.com/PoppaShell/WarPie.git
+cd WarPie
+sudo ./install/install.sh
+```
+
+Use this if you want to contribute or need the full development environment.
 
 The installer will guide you through:
 
