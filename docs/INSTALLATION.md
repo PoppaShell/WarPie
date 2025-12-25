@@ -31,17 +31,29 @@ Detailed installation instructions for WarPie on Raspberry Pi 4B.
 
 ## Installation Methods
 
-### Quick Install (Recommended)
+### Option 1: Release Tarball (Recommended)
+
+Download the latest release tarball - smaller and includes only runtime files:
 
 ```bash
-# Copy install.sh to your Pi
-scp install/install.sh pi@warpie:~/
-
-# SSH in and run
-ssh pi@warpie
-chmod +x install.sh
-sudo ./install.sh
+# Download and extract
+VERSION=2.4.1
+curl -L "https://github.com/PoppaShell/WarPie/releases/download/v${VERSION}/warpie-${VERSION}.tar.gz" | tar xz
+cd warpie-${VERSION}
+sudo ./install/install.sh
 ```
+
+### Option 2: Git Clone
+
+Clone the full repository (includes development files):
+
+```bash
+git clone https://github.com/PoppaShell/WarPie.git
+cd WarPie
+sudo ./install/install.sh
+```
+
+### Installer Options
 
 The installer guides you through:
 
@@ -49,6 +61,13 @@ The installer guides you through:
 2. BSSID discovery for your home APs
 3. Kismet exclusion configuration
 4. Optional neighbor network exclusions
+
+```bash
+sudo ./install/install.sh              # Full install with interactive setup
+sudo ./install/install.sh --test       # Validate installation (26 checks)
+sudo ./install/install.sh --configure  # Re-run WiFi and filter configuration
+sudo ./install/install.sh --uninstall  # Remove WarPie
+```
 
 ### Manual Installation
 

@@ -41,9 +41,17 @@ cd WarPie
 sudo ./install/install.sh
 ```
 
-### Option 2: Release Tarball (Coming Soon)
+### Option 2: Release Tarball (Recommended)
 
-*See [Issue #10](https://github.com/PoppaShell/WarPie/issues/10) for streamlined installation via release packages.*
+```bash
+# Download and extract latest release
+VERSION=2.4.1
+curl -L "https://github.com/PoppaShell/WarPie/releases/download/v${VERSION}/warpie-${VERSION}.tar.gz" | tar xz
+cd warpie-${VERSION}
+sudo ./install/install.sh
+```
+
+This method downloads only the runtime files (~128KB) without development tooling.
 
 The installer will guide you through:
 
