@@ -66,8 +66,7 @@ def load_target_lists() -> dict[str, Any]:
 
     # Remove hidden builtin lists from display
     for hidden_id in hidden_lists:
-        if hidden_id in lists:
-            del lists[hidden_id]
+        lists.pop(hidden_id, None)
 
     return lists
 

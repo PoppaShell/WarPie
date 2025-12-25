@@ -70,7 +70,7 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
     return ["No log entries found"]
 
 
-def get_logs(source: str = "wardrive", lines: int = 100) -> list[str]:  # noqa: PLR0911
+def get_logs(source: str = "wardrive", lines: int = 100) -> list[str]:
     """Get log content from various sources.
 
     Args:

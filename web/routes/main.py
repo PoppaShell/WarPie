@@ -238,7 +238,10 @@ def api_mode():
         )
 
         # Wrap buttons in OOB swap container - must include mode-grid class!
-        oob_html = f'<div class="mode-grid" id="mode-buttons" hx-swap-oob="true">{buttons_html}</div>'
+        oob_html = (
+            f'<div class="mode-grid" id="mode-buttons" hx-swap-oob="true">'
+            f"{buttons_html}</div>"
+        )
 
         return status_html + oob_html
     else:
