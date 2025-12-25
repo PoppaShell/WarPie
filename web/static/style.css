@@ -378,8 +378,8 @@ body::before {
 }
 
 .input::placeholder {
-    color: #00aa00;
-    opacity: 0.7;
+    color: #00cc00;
+    opacity: 0.8;
 }
 
 .form-input:focus,
@@ -391,7 +391,8 @@ body::before {
 
 .form-input::placeholder,
 .input::placeholder {
-    color: #004400;
+    color: #00bb00;
+    opacity: 0.75;
 }
 
 .form-select,

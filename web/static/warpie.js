@@ -566,20 +566,20 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// === HTMX Event Handlers ===
+// === Mode Button Instant Highlight ===
 
-// Instant highlight when mode button is clicked (before request completes)
-document.body.addEventListener('htmx:beforeRequest', function(evt) {
-    // Check if this is a mode button request
-    if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/api/mode') {
-        const clickedBtn = evt.detail.elt;
-        if (clickedBtn && clickedBtn.classList.contains('mode-btn')) {
-            // Remove active from all mode buttons, add to clicked one
-            document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
-            clickedBtn.classList.add('active');
-        }
+// Use direct click handler for immediate visual feedback (more reliable than htmx events)
+document.addEventListener('click', function(evt) {
+    // Find if click was on or inside a mode button
+    const modeBtn = evt.target.closest('.mode-btn');
+    if (modeBtn) {
+        // Remove active from all mode buttons, add to clicked one
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        modeBtn.classList.add('active');
     }
 });
+
+// === HTMX Event Handlers ===
 
 document.body.addEventListener('htmx:afterSwap', function(evt) {
     // Handle successful mode switch

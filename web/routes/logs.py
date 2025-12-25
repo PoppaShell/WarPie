@@ -28,10 +28,12 @@ def _get_wigle_logs(lines: int) -> list[str]:
         timeout=5,
     )
     if result.returncode == 0:
-        output = [f"=== {latest.name} ===", ""]
-        output.extend(
-            result.stdout.strip().split("\n") if result.stdout.strip() else ["(empty)"]
-        )
+        output = [f"=== {latest.name} ==="]
+        if result.stdout.strip():
+            # Strip each line and filter out empty lines
+            output.extend([line.strip() for line in result.stdout.strip().split("\n") if line.strip()])
+        else:
+            output.append("(empty)")
         return output
     return ["Error reading WiGLE CSV"]
 
@@ -50,7 +52,8 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
         timeout=5,
     )
     if result.returncode == 0 and result.stdout.strip():
-        return result.stdout.strip().split("\n")
+        # Strip each line and filter out empty lines
+        return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
     return ["No log entries found"]
 
 
