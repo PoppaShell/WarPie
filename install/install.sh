@@ -811,8 +811,8 @@ configure_kismet_permissions() {
     chmod 775 "$LOG_DIR"
     
     # Ensure kismet data directory is writable
-    chown -R "${WARPIE_USER}:kismet" "/home/${WARPIE_USER}/kismet"
-    chmod 775 "/home/${WARPIE_USER}/kismet"
+    chown -R root:kismet "/var/log/kismet"
+    chmod -R 775 "/var/log/kismet"
 
     # Check for BTLE (TI CC2540) capture support
     local KISMET_CAP_BTLE="/usr/bin/kismet_cap_ti_cc_2540"
@@ -2423,7 +2423,7 @@ run_tests() {
     echo "--- Directories ---"
     test_check "Config directory exists" "[[ -d ${WARPIE_DIR} ]]"
     test_check "Log directory exists" "[[ -d ${LOG_DIR} ]]"
-    test_check "Kismet log directory exists" "[[ -d /home/${WARPIE_USER}/kismet ]]"
+    test_check "Kismet log directory exists" "[[ -d /var/log/kismet/logs ]]"
     
     echo ""
     echo "--- Configuration Files ---"
@@ -2649,10 +2649,9 @@ uninstall() {
         rm -rf /var/log/warpie
 
         # Optionally remove Kismet logs
-        read -p "Remove Kismet capture logs in ~/kismet/? (yes/no): " remove_kismet_logs
+        read -p "Remove Kismet capture logs in /var/log/kismet/? (yes/no): " remove_kismet_logs
         if [[ "$remove_kismet_logs" == "yes" ]]; then
-            local kismet_user="${SUDO_USER:-$(logname 2>/dev/null || echo pi)}"
-            rm -rf "/home/${kismet_user}/kismet"
+            rm -rf "/var/log/kismet"
             log_info "Kismet logs removed"
         fi
     else
