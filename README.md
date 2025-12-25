@@ -1,13 +1,15 @@
 # WarPie - Raspberry Pi Wardriving Platform
 
-A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, GPS logging, and automatic network management.
+A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, BTLE scanning, GPS logging, and automatic network management.
 
 ## Features
 
-- **Dual-Band Capture**: Simultaneous 2.4GHz and 5/6GHz WiFi monitoring
+- **Dual-Band WiFi Capture**: Simultaneous 2.4GHz and 5/6GHz WiFi monitoring
+- **BTLE Support**: Optional Bluetooth Low Energy scanning with TI CC2540
 - **GPS Integration**: Location logging with GlobalSat BU-353S4 (or compatible)
 - **Auto Network Switching**: Connects to home WiFi when in range, creates AP when mobile
-- **Web Control Panel**: Switch Kismet modes from your phone (port 1337)
+- **Web Control Panel**: Flask-based control interface with cyberpunk terminal theme (port 1337)
+- **Network Filtering**: Static exclusions (MAC-based) and dynamic exclusions (SSID-based)
 - **Interactive Setup**: Guided configuration for home networks and exclusions
 - **Multiple Capture Modes**:
   - **Normal**: Full capture with home network exclusion
@@ -19,6 +21,7 @@ A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, GP
 - USB WiFi Adapter 1: ALFA AWUS036AXML (5GHz/6GHz)
 - USB WiFi Adapter 2: RT3070-based (2.4GHz)
 - GPS: GlobalSat BU-353S4 or similar USB GPS
+- Optional: TI CC2540 BTLE adapter
 - Power: 5V 3A USB-C power supply
 - Storage: 32GB+ microSD card
 
@@ -28,7 +31,7 @@ For detailed installation instructions, see [docs/INSTALLATION.md](docs/INSTALLA
 
 ```bash
 # Copy install.sh to your Pi
-scp install.sh pi@warpie:~/
+scp install/install.sh pi@warpie:~/
 
 # SSH in and run installer
 ssh pi@warpie
@@ -80,13 +83,31 @@ Optimized for mobile scanning:
 - Management frames only
 - Lower CPU/memory usage
 
+## Network Filtering
+
+WarPie supports two filtering paradigms for excluding unwanted networks:
+
+### Static Exclusions
+For networks with stable MAC addresses (home, neighbors, corporate):
+- Discovers BSSIDs from SSID
+- Adds to Kismet blocklist
+- Blocked at capture time (most efficient)
+
+### Dynamic Exclusions
+For networks with rotating MAC addresses (iPhone hotspots, Android):
+- Stores SSID pattern only
+- Post-processing removal by filter processor daemon
+- Never adds to MAC blocklist (MACs rotate)
+
 ## Configuration Files
 
 | File | Location | Purpose |
 |------|----------|---------|
 | Known BSSIDs | `/etc/warpie/known_bssids.conf` | Home network list for AP switching |
-| Kismet Site | `/usr/local/etc/kismet_site.conf` | GPS config, exclusion filters |
-| Wardrive Mode | `/usr/local/etc/kismet_wardrive.conf` | Optimized scanning settings |
+| Filter Rules | `/etc/warpie/filter_rules.conf` | Static/dynamic exclusion rules |
+| Adapter Config | `/etc/warpie/adapters.conf` | WiFi adapter band/channel settings |
+| Kismet Site | `/etc/kismet/kismet_site.conf` | GPS config, exclusion filters |
+| Wardrive Mode | `/etc/kismet/kismet_wardrive.conf` | Optimized scanning settings |
 
 ## Services
 
@@ -96,6 +117,7 @@ Optimized for mobile scanning:
 | `warpie-network` | Auto AP/client switching |
 | `wardrive` | Kismet capture |
 | `warpie-control` | Web control panel (port 1337) |
+| `warpie-filter-processor` | Dynamic exclusion post-processing |
 
 ### Service Commands
 
@@ -111,6 +133,22 @@ sudo systemctl restart wardrive
 
 # Recovery (restore normal WiFi)
 sudo warpie-recovery.sh
+```
+
+## Filter Management
+
+```bash
+# List all exclusions
+sudo warpie-filter-manager.py --list
+
+# Add static exclusion (stable MAC network)
+sudo warpie-filter-manager.py --add-static "HomeNetwork"
+
+# Add dynamic exclusion (rotating MAC network)
+sudo warpie-filter-manager.py --add-dynamic "iPhone-*"
+
+# JSON mode for scripting
+sudo warpie-filter-manager.py --json --list
 ```
 
 ## Reconfiguring
@@ -194,15 +232,19 @@ Kismet creates WiGLE-compatible CSV files in `/home/pi/kismet/`. Upload these to
 ```
 /etc/warpie/                    # Configuration
   known_bssids.conf             # Home network BSSIDs
+  filter_rules.conf             # Exclusion/targeting rules
+  adapters.conf                 # WiFi adapter settings
 
-/usr/local/etc/                 # Kismet configs
+/etc/kismet/                    # Kismet configs
   kismet_site.conf              # Main config + exclusions
   kismet_wardrive.conf          # Wardrive mode
 
 /usr/local/bin/                 # Scripts
-  network-manager.sh            # AP/client switching
+  warpie-network-manager.sh     # AP/client switching
   wardrive.sh                   # Kismet launcher
-  warpie-control.py             # Web control panel
+  warpie-control                # Web control panel
+  warpie-filter-manager.py      # Filter CLI tool
+  warpie-filter-processor.py    # Post-processing daemon
   warpie-recovery.sh            # Emergency recovery
 
 /var/log/warpie/                # Logs
@@ -211,11 +253,14 @@ Kismet creates WiGLE-compatible CSV files in `/home/pi/kismet/`. Upload these to
 
 ## License
 
-MIT License
+GPL-3.0-or-later
 
 ## Credits
 
 Built with:
 - [Kismet](https://www.kismetwireless.net/) - Wireless network detector
 - [gpsd](https://gpsd.gitlab.io/gpsd/) - GPS daemon
+- [Flask](https://flask.palletsprojects.com/) - Web framework
+- [HTMX](https://htmx.org/) - Frontend interactivity
+- [Waitress](https://docs.pylonsproject.org/projects/waitress/) - WSGI server
 - Raspberry Pi OS

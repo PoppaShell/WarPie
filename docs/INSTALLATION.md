@@ -15,6 +15,12 @@ Detailed installation instructions for WarPie on Raspberry Pi 4B.
 | Power | 5V 3A USB-C | Reliable power |
 | Storage | 32GB+ microSD | OS and logs |
 
+### Optional Hardware
+
+| Component | Model | Purpose |
+|-----------|-------|---------|
+| BTLE Adapter | TI CC2540 | Bluetooth Low Energy scanning |
+
 ### WiFi Interface Mapping
 
 | Interface | Device | Bands | Purpose |
@@ -29,7 +35,7 @@ Detailed installation instructions for WarPie on Raspberry Pi 4B.
 
 ```bash
 # Copy install.sh to your Pi
-scp install.sh pi@warpie:~/
+scp install/install.sh pi@warpie:~/
 
 # SSH in and run
 ssh pi@warpie
@@ -38,6 +44,7 @@ sudo ./install.sh
 ```
 
 The installer guides you through:
+
 1. Home network SSID and password
 2. BSSID discovery for your home APs
 3. Kismet exclusion configuration
@@ -49,7 +56,8 @@ The installer guides you through:
 
 ```bash
 sudo apt update
-sudo apt install -y gpsd gpsd-clients kismet hostapd dnsmasq
+sudo apt install -y gpsd gpsd-clients kismet hostapd dnsmasq python3-pip
+pip3 install flask waitress
 ```
 
 #### 2. Configure Udev Rules
@@ -65,6 +73,7 @@ SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:c0:ca:89:21:7e", NAME="wlan2
 ```
 
 Apply the rules:
+
 ```bash
 sudo udevadm control --reload-rules
 sudo udevadm trigger
@@ -130,10 +139,14 @@ rsn_pairwise=CCMP
 #### 7. Install Scripts
 
 ```bash
-sudo cp bin/network-manager.sh /usr/local/bin/
+sudo cp bin/warpie-network-manager.sh /usr/local/bin/
 sudo cp bin/wardrive.sh /usr/local/bin/
-sudo cp bin/warpie-control.py /usr/local/bin/
-sudo chmod +x /usr/local/bin/*.sh /usr/local/bin/*.py
+sudo cp bin/warpie-control /usr/local/bin/
+sudo cp bin/warpie-filter-manager.py /usr/local/bin/
+sudo cp bin/warpie-filter-processor.py /usr/local/bin/
+sudo cp -r web /usr/local/lib/warpie-web
+sudo chmod +x /usr/local/bin/warpie-*
+sudo chmod +x /usr/local/bin/wardrive.sh
 ```
 
 #### 8. Configure Systemd Services
@@ -141,12 +154,14 @@ sudo chmod +x /usr/local/bin/*.sh /usr/local/bin/*.py
 Install service units and enable:
 
 ```bash
+sudo cp systemd/*.service /etc/systemd/system/
 sudo systemctl daemon-reload
 sudo systemctl mask gpsd.service gpsd.socket
 sudo systemctl enable gpsd-wardriver
 sudo systemctl enable warpie-network
 sudo systemctl enable wardrive
 sudo systemctl enable warpie-control
+sudo systemctl enable warpie-filter-processor
 ```
 
 #### 9. Reboot
@@ -169,7 +184,7 @@ This runs 26 validation checks on your installation.
 
 | Service | URL | Purpose |
 |---------|-----|---------|
-| Control Panel | http://<pi-ip>:1337 | Mode switching, logs |
+| Control Panel | http://<pi-ip>:1337 | Mode switching, logs, filters |
 | Kismet UI | http://<pi-ip>:2501 | Network viewer |
 
 ### Default AP Credentials
@@ -185,16 +200,19 @@ When away from home, WarPie creates an access point:
 ### Add a Mesh Node or Additional AP
 
 1. Get the BSSID while connected:
+
    ```bash
    iw dev wlan0 link | grep -i bssid
    ```
 
 2. Add to `/etc/warpie/known_bssids.conf`:
+
    ```
    XX:XX:XX:XX:XX:XX|HomeNetwork|20|Mesh node - upstairs
    ```
 
 3. Add to `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`:
+
    ```
    network={
        ssid="HomeNetwork"
@@ -206,6 +224,7 @@ When away from home, WarPie creates an access point:
    ```
 
 4. Restart the network service:
+
    ```bash
    sudo systemctl restart warpie-network
    ```
@@ -219,6 +238,7 @@ sudo ./install.sh --configure
 ```
 
 This lets you:
+
 - Change home network SSID
 - Update Kismet exclusions
 - Scan for new networks

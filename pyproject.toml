@@ -1,6 +1,6 @@
 [project]
 name = "warpie"
-version = "2.4.1-dev"
+version = "2.4.1"
 description = "Raspberry Pi Wardriving Platform with Kismet integration"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
@@ -28,9 +28,9 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/warpie/warpie"
-Repository = "https://github.com/warpie/warpie"
-Issues = "https://github.com/warpie/warpie/issues"
+Homepage = "https://github.com/PoppaShell/WarPie"
+Repository = "https://github.com/PoppaShell/WarPie"
+Issues = "https://github.com/PoppaShell/WarPie/issues"
 
 [build-system]
 requires = ["setuptools>=61.0"]

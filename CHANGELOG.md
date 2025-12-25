@@ -5,36 +5,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.4.1] - 2025-12-25
 
 ### Added
 
-- Unified filter manager script (`warpie-filter-manager.sh`) with support for:
-  - Static exclusions (block stable-MAC networks at capture time)
-  - Dynamic exclusions (post-processing removal for rotating-MAC networks)
-  - Targeting inclusions (add OUI prefixes to targeting modes like )
-- JSON API mode for all filter management operations (web integration)
-- Web filter management UI with tabbed Filters flyout (Exclusions + Targeting tabs)
-- Filter API endpoints in `warpie-control.py`:
-  - `GET/POST/DELETE /api/filters` for static/dynamic exclusions
-  - `GET/POST/DELETE /api/filters/targets` for targeting inclusions
-- JavaScript tooling:
-  - ESLint for embedded JavaScript linting
-  - Jest + JSDOM for JavaScript unit tests (15 tests)
-  - Extraction script for linting JS embedded in Python templates
-- Project tooling configuration (Ruff, ShellCheck, pytest, pre-commit)
-- GPL-3.0 License (kept existing)
-- EditorConfig for consistent formatting
-- Pre-commit hooks for automated code quality checks
-- GitHub repository structure
-- Initial test suite with pytest and Jest
+- Flask + HTMX web control panel with cyberpunk terminal theme
+- Filter manager Python implementation (`warpie-filter-manager.py`) with multi-PHY support
+- Filter processor daemon (`warpie-filter-processor.py`) for dynamic exclusion post-processing
+- BTLE/Classic Bluetooth support with TI CC2540 adapter
+- Multi-PHY filter rules (WiFi, BTLE, Classic Bluetooth sections)
+- Pre-upload sanitization workflow for WiGLE uploads
+- Reboot button in control panel
+- JavaScript testing infrastructure (Jest + JSDOM)
 
 ### Changed
 
-- Migrated project from Claude Project to GitHub repository
-- Updated NETWORK_FILTERING_ENHANCEMENT.md with targeting inclusions paradigm
-- Web control panel upgraded to v2.4.1
-- Refactored `do_POST` handler for better code organization
+- Migrated web control panel from custom `http.server` to Flask + Waitress
+- Migrated filter manager from Bash to Python for better maintainability
+- Web UI redesigned with terminal/cyberpunk aesthetic
+- Improved mode switching with HTMX for seamless updates
+- Enhanced filter management UI with static/dynamic exclusion paradigms
+
+### Fixed
+
+- Network manager mode detection using IP check instead of process detection
+- AP startup stability with condition-based waiting
+- Branch detection for installer script downloads
+- BTLE device detection at runtime for USB path changes
+- Subprocess and pipefail error handling in network manager
+- 30+ UI/UX improvements including tooltips, font scaling, form handling
 
 ## [2.4.0] - 2024-12-11
 
@@ -67,7 +66,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - GPS integration with GlobalSat BU-353S4
 - Mobile access point mode (WarPie network)
 - Automatic home/away network detection
-- Multiple Kismet capture modes (Normal, Wardrive, )
+- Multiple Kismet capture modes (Normal, Wardrive)
 - WiGLE CSV logging for network uploads
 
 ### Hardware Support
@@ -77,6 +76,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RT3070-based adapter (2.4GHz)
 - GlobalSat BU-353S4 GPS receiver
 
-[Unreleased]: https://github.com/warpie/warpie/compare/v2.4.0...HEAD
-[2.4.0]: https://github.com/warpie/warpie/compare/v2.3.0...v2.4.0
-[2.3.0]: https://github.com/warpie/warpie/releases/tag/v2.3.0
+[2.4.1]: https://github.com/PoppaShell/WarPie/compare/v2.4.0...v2.4.1
+[2.4.0]: https://github.com/PoppaShell/WarPie/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/PoppaShell/WarPie/releases/tag/v2.3.0
