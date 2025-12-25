@@ -539,8 +539,13 @@ def configure_home_wifi() -> dict[str, str] | None:
         return None
 
 
-def configure_kismet_autostart() -> bool:
-    """Configure Kismet auto-start behavior."""
+def configure_kismet_autostart() -> tuple[bool, str]:
+    """Configure Kismet auto-start behavior and startup mode.
+
+    Returns:
+        Tuple of (autostart: bool, startup_mode: str)
+        startup_mode is one of: "wardrive", "normal", "targeted"
+    """
     console.print()
     console.print(
         Panel.fit(
@@ -566,12 +571,58 @@ def configure_kismet_autostart() -> bool:
         amark="",
     ).execute()
 
+    startup_mode = "wardrive"  # Default
+
     if autostart:
-        console.print("[green]✓ Kismet will auto-start on boot (Field Deployment)[/green]")
+        console.print("[green]✓ Kismet will auto-start on boot[/green]")
+
+        # Ask for startup mode
+        console.print()
+        console.print(
+            Panel.fit(
+                "[bold white]Startup Capture Mode[/bold white]\n\n"
+                "Which mode should Kismet start in?\n\n"
+                "[bright_green]■[/bright_green] [bold]Wardrive[/bold] (Recommended)\n"
+                "   → Optimized for mobile capture\n"
+                "   → Excludes home networks\n"
+                "   → Best for field deployment\n\n"
+                "[dim]□[/dim] [bold]Normal[/bold]\n"
+                "   → Standard Kismet capture\n"
+                "   → No exclusions applied\n"
+                "   → Good for testing\n\n"
+                "[dim]□[/dim] [bold]Targeted[/bold]\n"
+                "   → OUI prefix filtering\n"
+                "   → Only captures specific manufacturers\n"
+                "   → Requires target list configuration",
+                border_style="cyan",
+            )
+        )
+
+        mode_choices = [
+            {"name": "Wardrive - Optimized mobile capture (Recommended)", "value": "wardrive"},
+            {"name": "Normal - Standard capture, no exclusions", "value": "normal"},
+            {"name": "Targeted - OUI prefix filtering", "value": "targeted"},
+        ]
+
+        startup_mode = inquirer.select(
+            message="Select startup mode:",
+            choices=mode_choices,
+            default="wardrive",
+            qmark="",
+            amark="",
+            pointer=INDICATOR_POINTER,
+        ).execute()
+
+        mode_display = {
+            "wardrive": "[green]Wardrive[/green] (mobile capture)",
+            "normal": "[yellow]Normal[/yellow] (standard capture)",
+            "targeted": "[cyan]Targeted[/cyan] (OUI filtering)",
+        }
+        console.print(f"[green]✓ Startup mode: {mode_display[startup_mode]}[/green]")
     else:
         console.print("[yellow]⊘ Kismet manual start (start from web app)[/yellow]")
 
-    return autostart
+    return autostart, startup_mode
 
 
 def configure_btle(btle_adapters: list[BTLEAdapter]) -> dict[str, str] | None:
@@ -636,6 +687,7 @@ def save_config(
     configs: list[AdapterConfig],
     home_wifi: dict[str, str] | None = None,
     kismet_autostart: bool = True,
+    kismet_startup_mode: str = "wardrive",
     btle_config: dict[str, str] | None = None,
     output_path: str = "/etc/warpie/adapters.conf",
 ) -> None:
@@ -700,6 +752,7 @@ def save_config(
             "",
             "# Kismet Configuration",
             f'KISMET_AUTOSTART="{str(kismet_autostart).lower()}"',
+            f'KISMET_STARTUP_MODE="{kismet_startup_mode}"',
             "",
             f"WIFI_CAPTURE_COUNT={len(configs)}",
             "",
@@ -794,8 +847,8 @@ def main():  # noqa: PLR0912, PLR0915
     )
     home_wifi = configure_home_wifi()
 
-    # Step 5: Kismet auto-start
-    kismet_autostart = configure_kismet_autostart()
+    # Step 5: Kismet auto-start and startup mode
+    kismet_autostart, kismet_startup_mode = configure_kismet_autostart()
 
     # Step 6: BTLE configuration (if adapters detected)
     btle_config = configure_btle(btle_adapters)
@@ -828,9 +881,15 @@ def main():  # noqa: PLR0912, PLR0915
         summary_table.add_row("[bold]Home WiFi[/bold]", "[yellow]Disabled[/yellow]")
 
     # Kismet auto-start summary
+    mode_labels = {
+        "wardrive": "[green]Wardrive[/green]",
+        "normal": "[yellow]Normal[/yellow]",
+        "targeted": "[cyan]Targeted[/cyan]",
+    }
     if kismet_autostart:
         summary_table.add_row(
-            "[bold]Kismet Auto-Start[/bold]", "[green]Enabled[/green] (Field Deployment)"
+            "[bold]Kismet Auto-Start[/bold]",
+            f"[green]Enabled[/green] - {mode_labels.get(kismet_startup_mode, kismet_startup_mode)} mode",
         )
     else:
         summary_table.add_row(
@@ -868,7 +927,7 @@ def main():  # noqa: PLR0912, PLR0915
     if inquirer.confirm(
         message="Save this configuration?", default=True, instruction="Y/n"
     ).execute():
-        save_config(ap, configs, home_wifi, kismet_autostart, btle_config)
+        save_config(ap, configs, home_wifi, kismet_autostart, kismet_startup_mode, btle_config)
         return 0
     else:
         console.print("[yellow]Configuration cancelled[/yellow]")

@@ -1517,6 +1517,9 @@ configure_wardrive_service() {
     chmod +x /usr/local/bin/wardrive.sh
     log_success "Wardrive script installed"
     
+    # Get startup mode from config, default to wardrive
+    local startup_mode="${KISMET_STARTUP_MODE:-wardrive}"
+
     # Create systemd service - runs as non-root user in kismet group
     cat > /etc/systemd/system/wardrive.service << SERVICE_EOF
 [Unit]
@@ -1528,7 +1531,7 @@ Wants=gpsd-wardriver.service
 Type=simple
 User=${WARPIE_USER}
 Group=kismet
-Environment=KISMET_MODE=normal
+Environment=KISMET_MODE=${startup_mode}
 ExecStart=/usr/local/bin/wardrive.sh
 Restart=on-failure
 RestartSec=10
@@ -1538,7 +1541,7 @@ WorkingDirectory=/var/log/kismet
 WantedBy=multi-user.target
 SERVICE_EOF
 
-    log_success "Wardrive service configured"
+    log_success "Wardrive service configured (startup mode: ${startup_mode})"
 }
 
 # =============================================================================
