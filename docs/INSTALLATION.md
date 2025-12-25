@@ -84,7 +84,9 @@ sudo udevadm trigger
 ```bash
 sudo mkdir -p /etc/warpie
 sudo mkdir -p /var/log/warpie
-mkdir -p ~/kismet/logs
+sudo mkdir -p /var/log/kismet/logs
+sudo chown -R root:kismet /var/log/kismet
+sudo chmod -R 775 /var/log/kismet
 ```
 
 #### 4. Configure Known BSSIDs

@@ -248,7 +248,7 @@ sudo warpie-recovery.sh
 Kismet creates WiGLE-compatible CSV files organized by mode and date:
 
 ```text
-~/kismet/logs/<mode>/<date>/*.wiglecsv
+/var/log/kismet/logs/<mode>/<date>/*.wiglecsv
 ```
 
 Upload these to [wigle.net](https://wigle.net) to contribute to the wireless network database.
@@ -273,7 +273,7 @@ Upload these to [wigle.net](https://wigle.net) to contribute to the wireless net
   warpie-filter-processor.py    # Post-processing daemon
 
 /var/log/warpie/                # Application logs
-~/kismet/logs/                  # Kismet capture files
+/var/log/kismet/logs/           # Kismet capture files
 ```
 
 ## Documentation

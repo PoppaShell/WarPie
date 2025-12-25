@@ -66,7 +66,7 @@ The following are NOT considered security vulnerabilities:
 - Change the default AP password from `wardriving`
 - Restrict access to port 1337 to trusted devices
 - Protect `/etc/warpie/` configuration files
-- Secure Kismet logs in `~/kismet/logs/`
+- Secure Kismet logs in `/var/log/kismet/logs/`
 - Be aware of local laws regarding WiFi packet capture
 
 ---

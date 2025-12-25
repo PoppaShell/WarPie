@@ -255,7 +255,7 @@ WarPie is a wardriving platform that manages:
 ├── wardrive.log
 └── dnsmasq.log
 
-~/kismet/                       # Capture data
+/var/log/kismet/                # Capture data
 └── logs/
     ├── normal/
     ├── wardrive/
