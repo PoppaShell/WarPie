@@ -680,7 +680,7 @@ select option {
 }
 
 .log-line {
-    margin-bottom: 2px;
+    /* No margin - logs stack directly */
 }
 
 .log-line.error {
@@ -710,6 +710,22 @@ select option {
 .target-lists,
 .oui-list {
     margin-top: 15px;
+}
+
+.oui-value {
+    color: var(--fg);
+    font-size: calc(12px * var(--font-scale));
+}
+
+.oui-desc {
+    font-size: calc(10px * var(--font-scale));
+    color: var(--fg-dim);
+    margin-left: 8px;
+}
+
+.oui-builtin {
+    font-size: calc(10px * var(--font-scale));
+    color: var(--fg-dim);
 }
 
 .target-checkbox-name {

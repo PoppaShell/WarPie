@@ -194,8 +194,14 @@ function setStaticPhy(phy) {
         scanForm.classList.add('hidden');
         directMacForm.classList.remove('hidden');
     }
-    // Refresh list with PHY filter
-    htmx.ajax('GET', '/api/filters/static?limit=5&phy=' + phy, '#static-exclusion-list');
+    // Refresh list with PHY filter (use fetch to avoid loading indicator flash)
+    fetch('/api/filters/static?limit=5&phy=' + phy, {
+        headers: {'HX-Request': 'true'}
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('static-exclusion-list').innerHTML = html;
+    });
 }
 
 function setDynamicPhy(phy) {
@@ -213,8 +219,14 @@ function setDynamicPhy(phy) {
     } else {
         input.placeholder = 'Bluetooth name or pattern (* = wildcard)';
     }
-    // Refresh list with PHY filter
-    htmx.ajax('GET', '/api/filters/dynamic?limit=5&phy=' + phy, '#dynamic-exclusion-list');
+    // Refresh list with PHY filter (use fetch to avoid loading indicator flash)
+    fetch('/api/filters/dynamic?limit=5&phy=' + phy, {
+        headers: {'HX-Request': 'true'}
+    })
+    .then(response => response.text())
+    .then(html => {
+        document.getElementById('dynamic-exclusion-list').innerHTML = html;
+    });
 }
 
 function addDirectMAC() {
@@ -484,6 +496,11 @@ function removeOUI(listId, oui) {
                 showToast(data.error || 'Failed', true);
             }
         });
+}
+
+function removeOUIFromList(oui) {
+    const listId = document.getElementById('target-editor-flyout').dataset.listId;
+    removeOUI(listId, oui);
 }
 
 // === Toast Notifications ===

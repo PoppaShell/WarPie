@@ -236,7 +236,7 @@ def api_mode():
         )
 
         # Wrap buttons in OOB swap container
-        oob_html = f'<div id="mode-buttons" hx-swap-oob="innerHTML">{buttons_html}</div>'
+        oob_html = f'<div id="mode-buttons" hx-swap-oob="true">{buttons_html}</div>'
 
         return status_html + oob_html
     else:

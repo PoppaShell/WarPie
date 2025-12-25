@@ -172,13 +172,24 @@ def api_create_target_list():
 
 @targets_bp.route("/targets/lists/<list_id>")
 def api_get_target_list(list_id: str):
-    """Get details of a specific target list."""
+    """Get details of a specific target list.
+
+    Returns HTML (OUI list) for HTMX requests, JSON otherwise.
+    """
     lists = load_target_lists()
 
     if list_id not in lists:
+        if request.headers.get("HX-Request"):
+            return '<div class="error-message">List not found</div>', 404
         return jsonify({"success": False, "error": "List not found"}), 404
 
-    return jsonify({"success": True, "list": lists[list_id]})
+    target_list = lists[list_id]
+
+    # Return HTML for HTMX requests
+    if request.headers.get("HX-Request"):
+        return render_template("partials/_oui_list.html", ouis=target_list.get("ouis", []))
+
+    return jsonify({"success": True, "list": target_list})
 
 
 @targets_bp.route("/targets/lists/<list_id>", methods=["PUT"])
