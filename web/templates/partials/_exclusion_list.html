@@ -1,0 +1,16 @@
+{% if exclusions %}
+{% for item in exclusions %}
+<div class="exclusion-item">
+    <div class="exclusion-info">
+        <span class="exclusion-ssid">{{ item.ssid or item.value }}</span>
+        {% if item.description %}
+        <span class="exclusion-meta">({{ item.description }})</span>
+        {% endif %}
+    </div>
+    <span class="exclusion-type">[{{ item.type|upper }}]</span>
+    <button class="btn-remove" onclick="removeFilter('{{ exclusion_type }}', '{{ item.ssid or item.value }}', '{{ phy }}')">[X]</button>
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">No {{ exclusion_type }} exclusions</div>
+{% endif %}

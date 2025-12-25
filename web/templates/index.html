@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}WarPie Controller{% endblock %}
+
+{% block content %}
+<header class="header">
+    <h1>WARPIE CONTROLLER</h1>
+</header>
+
+<!-- Status Panel -->
+<div class="terminal-box" id="status-panel"
+     hx-get="/api/status/html"
+     hx-trigger="every 3s"
+     hx-swap="innerHTML">
+    {% include "partials/_status.html" %}
+</div>
+
+<!-- Mode Selection -->
+<div class="terminal-box">
+    <div class="title">[MODE]</div>
+    <div class="content">
+        <div class="mode-grid" id="mode-buttons">
+            {% include "partials/_mode_buttons.html" %}
+        </div>
+
+        <!-- Target List Picker (shown when Targeted mode selected) -->
+        <div id="target-picker" class="target-picker hidden">
+            {% include "partials/_target_picker.html" %}
+        </div>
+    </div>
+</div>
+
+<!-- Controls -->
+<div class="terminal-box">
+    <div class="title">[CONTROLS]</div>
+    <div class="content">
+        {% include "partials/_controls.html" %}
+    </div>
+</div>
+
+<hr class="separator">
+
+<!-- Navigation Links -->
+<nav class="nav-row">
+    <button class="nav-btn" onclick="openFilters()">FILTERS</button>
+    <button class="nav-btn" onclick="openLogs()">LOGS</button>
+    <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">KISMET</a>
+</nav>
+
+<!-- Bottom Bar -->
+<div class="bottom-bar">
+    <div class="font-controls">
+        <button class="font-btn" onclick="decreaseFontSize()" title="Decrease font size">A-</button>
+        <button class="font-btn" onclick="increaseFontSize()" title="Increase font size">A+</button>
+    </div>
+</div>
+
+<!-- Flyout Overlay -->
+<div class="flyout-overlay" id="flyout-overlay" onclick="closeAllFlyouts()"></div>
+
+<!-- Log Viewer Flyout -->
+<div class="flyout" id="log-flyout">
+    {% include "partials/_flyout_logs.html" %}
+</div>
+
+<!-- Network Filters Flyout -->
+<div class="flyout" id="filters-flyout">
+    {% include "partials/_flyout_filters.html" %}
+</div>
+
+<!-- Target List Editor Flyout -->
+<div class="flyout sub-flyout" id="target-editor-flyout">
+    {% include "partials/_target_list_editor.html" %}
+</div>
+
+<!-- Static Exclusions Manager Flyout -->
+<div class="flyout sub-flyout" id="static-manager-flyout">
+    {% include "partials/_static_manager.html" %}
+</div>
+
+<!-- Dynamic Exclusions Manager Flyout -->
+<div class="flyout sub-flyout" id="dynamic-manager-flyout">
+    {% include "partials/_dynamic_manager.html" %}
+</div>
+{% endblock %}

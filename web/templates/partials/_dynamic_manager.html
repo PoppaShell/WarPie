@@ -1,0 +1,15 @@
+<div class="flyout-header">
+    <h2>[DYNAMIC EXCLUSIONS]</h2>
+    <button class="flyout-close" onclick="closeDynamicManager()">[X]</button>
+</div>
+
+<div class="flyout-content">
+    <p class="section-desc">All dynamic exclusions. These are removed during post-processing by SSID match.</p>
+
+    <div class="exclusion-list" id="dynamic-manager-list"
+         hx-get="/api/filters/dynamic"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="loading"><span class="spinner"></span></div>
+    </div>
+</div>

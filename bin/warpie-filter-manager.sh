@@ -31,7 +31,6 @@ readonly LEGACY_EXCLUSIONS_FILE="${WARPIE_DIR}/ssid_exclusions.conf"
 readonly KISMET_CONF_DIR="/usr/local/etc"
 readonly KISMET_SITE_CONF="${KISMET_CONF_DIR}/kismet_site.conf"
 readonly KISMET_WARDRIVE_CONF="${KISMET_CONF_DIR}/kismet_wardrive.conf"
-readonly KISMET__CONF="${KISMET_CONF_DIR}/kismet_.conf"
 readonly KISMET_LOGS_DIR="${HOME}/kismet/logs"
 readonly SCAN_INTERFACE="wlan0"
 
@@ -474,16 +473,8 @@ add_target_oui() {
         json_error "Invalid OUI format. Use XX:XX:XX:* or full MAC"
     fi
 
-    # Validate mode
-    local mode_config=""
-    case "$mode" in
-        )
-            mode_config="$KISMET__CONF"
-            ;;
-        *)
-            json_error "Unknown targeting mode: $mode. Available: "
-            ;;
-    esac
+    # All targeting modes use the site config
+    local mode_config="$KISMET_SITE_CONF"
 
     # Convert user format to Kismet mask format
     local kismet_oui kismet_mask
@@ -601,15 +592,10 @@ remove_target_oui() {
     # Remove from config file
     sudo sed -i "/^${oui//\*/\\*}|${mode}|/d" "$FILTER_RULES_FILE"
 
-    # Remove from targeting mode config
-    local mode_config=""
-    case "$mode" in
-        )
-            mode_config="$KISMET__CONF"
-            ;;
-    esac
+    # All targeting modes use the site config
+    local mode_config="$KISMET_SITE_CONF"
 
-    if [[ -n "$mode_config" && -f "$mode_config" ]]; then
+    if [[ -f "$mode_config" ]]; then
         local marker="# WARPIE_TARGET: $oui"
         sudo sed -i "/$marker/d" "$mode_config"
 

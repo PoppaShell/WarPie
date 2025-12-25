@@ -1,0 +1,15 @@
+<div class="title">[STATUS]</div>
+<div class="content">
+    <div class="status-row">
+        <span class="status-label">KISMET</span>
+        <span class="status-value {% if status == 'Running' %}running{% else %}stopped{% endif %}">[{{ status|upper }}]</span>
+    </div>
+    <div class="status-row">
+        <span class="status-label">MODE</span>
+        <span class="status-value">{{ current_mode|upper }}</span>
+    </div>
+    <div class="status-row">
+        <span class="status-label">UPTIME</span>
+        <span class="status-value">{{ uptime }}</span>
+    </div>
+</div>

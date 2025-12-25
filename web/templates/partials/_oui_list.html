@@ -1,0 +1,19 @@
+{% if ouis %}
+{% for oui in ouis %}
+<div class="oui-item">
+    <div class="oui-info">
+        <span class="oui-value mono">{{ oui.oui }}</span>
+        {% if oui.description %}
+        <span class="oui-desc">({{ oui.description }})</span>
+        {% endif %}
+    </div>
+    {% if not oui.builtin %}
+    <button class="btn-remove" onclick="removeOUIFromList('{{ oui.oui }}')">[X]</button>
+    {% else %}
+    <span class="oui-builtin">[BUILT-IN]</span>
+    {% endif %}
+</div>
+{% endfor %}
+{% else %}
+<div class="empty-state">No OUIs in this list</div>
+{% endif %}

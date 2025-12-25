@@ -1,0 +1,142 @@
+<div class="flyout-header">
+    <h2>[FILTERS]</h2>
+    <button class="flyout-close" onclick="closeFilters()">[X]</button>
+</div>
+
+<!-- Unsaved Changes Banner - shows when filters modified -->
+<div id="unsaved-changes-banner" class="unsaved-banner hidden">
+    <span class="unsaved-text">Unsaved changes</span>
+    <div class="unsaved-actions">
+        <button class="btn btn-primary btn-small" onclick="applyChanges()">APPLY</button>
+        <button class="btn btn-small" onclick="discardChanges()">DISCARD</button>
+    </div>
+</div>
+
+<div class="flyout-content">
+    <!-- STATIC EXCLUSIONS SECTION -->
+    <div class="filter-section">
+        <h3 class="section-title">STATIC EXCLUSIONS</h3>
+        <p class="section-desc">Block at capture time via BSSID. For networks with static MACs.</p>
+
+        <!-- Static Add Form -->
+        <div class="add-form">
+            <!-- PHY Type Selector -->
+            <div class="phy-selector" id="static-phy-selector">
+                <button class="phy-btn active" data-phy="wifi" onclick="setStaticPhy('wifi')">WIFI</button>
+                <button class="phy-btn" data-phy="btle" onclick="setStaticPhy('btle')">BTLE</button>
+                <button class="phy-btn" data-phy="bt" onclick="setStaticPhy('bt')">BT</button>
+            </div>
+
+            <!-- WiFi Input Mode Toggle (scan vs direct) -->
+            <div class="input-mode-toggle" id="wifi-input-mode">
+                <button class="toggle-btn active" data-mode="scan" onclick="setWifiInputMode('scan')">SCAN SSID</button>
+                <button class="toggle-btn" data-mode="direct" onclick="setWifiInputMode('direct')">ADD BSSID</button>
+            </div>
+
+            <!-- Scan by SSID form (default for WiFi) -->
+            <div id="static-scan-form">
+                <div class="input-row">
+                    <input type="text" id="static-ssid-input" class="input" placeholder="Enter SSID to scan...">
+                    <button class="btn" onclick="scanForStatic()">SCAN</button>
+                </div>
+            </div>
+
+            <!-- Direct MAC/BSSID input (for BTLE/BT, or WiFi direct mode) -->
+            <div class="direct-mac-form hidden" id="static-direct-mac-form">
+                <div class="input-row">
+                    <input type="text" id="static-mac-input" class="input" placeholder="MAC/BSSID (AA:BB:CC:11:22:33)">
+                    <button class="btn" onclick="addDirectMAC()">ADD</button>
+                </div>
+                <input type="text" id="static-desc-input" class="input" placeholder="Description (optional)">
+            </div>
+
+            <!-- Scan Results (hidden by default) -->
+            <div class="scan-results hidden" id="static-scan-results">
+                <h4>Found Networks:</h4>
+                <div id="static-found-networks"></div>
+            </div>
+        </div>
+
+        <!-- Recent Static Exclusions -->
+        <div class="exclusion-list-header">
+            <span>Recently Added</span>
+            <button class="btn btn-small" onclick="openStaticManager()">VIEW ALL</button>
+        </div>
+        <div class="exclusion-list" id="static-exclusion-list"
+             hx-get="/api/filters/static?limit=5"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span></div>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- DYNAMIC EXCLUSIONS SECTION -->
+    <div class="filter-section">
+        <h3 class="section-title">DYNAMIC EXCLUSIONS</h3>
+        <p class="section-desc">Removed during post-processing. For networks with rotating MACs. Wildcards supported <span class="tooltip-trigger">[?]<span class="tooltip-content">Wildcard examples:<br>Guest* - matches Guest, Guest-5G<br>*Hotspot - matches MyHotspot<br>Net?ork - matches Network, Netw0rk</span></span></p>
+
+        <!-- Dynamic Add Form - No Scan Needed -->
+        <div class="add-form">
+            <!-- PHY Type Selector -->
+            <div class="phy-selector" id="dynamic-phy-selector">
+                <button class="phy-btn active" data-phy="wifi" onclick="setDynamicPhy('wifi')">WIFI</button>
+                <button class="phy-btn" data-phy="btle" onclick="setDynamicPhy('btle')">BTLE</button>
+                <button class="phy-btn" data-phy="bt" onclick="setDynamicPhy('bt')">BT</button>
+            </div>
+
+            <div class="input-row">
+                <input type="text" id="dynamic-ssid-input" class="input" placeholder="SSID or pattern (* = wildcard)">
+                <button class="btn" onclick="addDynamicExclusion()">ADD</button>
+            </div>
+            <input type="text" id="dynamic-desc-input" class="input" placeholder="Description (optional)">
+        </div>
+
+        <!-- Recent Dynamic Exclusions -->
+        <div class="exclusion-list-header">
+            <span>Recently Added</span>
+            <button class="btn btn-small" onclick="openDynamicManager()">VIEW ALL</button>
+        </div>
+        <div class="exclusion-list" id="dynamic-exclusion-list"
+             hx-get="/api/filters/dynamic?limit=5"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span></div>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- Target Lists Section -->
+    <div class="filter-section">
+        <h3 class="section-title">TARGET LISTS</h3>
+
+        <button class="btn btn-block" onclick="openCreateTargetList()">+ CREATE NEW LIST</button>
+
+        <div class="target-lists" id="target-lists"
+             hx-get="/api/targets/lists?view=manage"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span></div>
+        </div>
+    </div>
+
+    <hr class="section-divider">
+
+    <!-- Actions Section -->
+    <div class="filter-section">
+        <h3 class="section-title">HISTORICAL LOGS</h3>
+        <p class="section-desc">Clean excluded networks from past captures before uploading.</p>
+
+        <div class="btn-row">
+            <button class="btn btn-block"
+                    hx-post="/api/filters/cleanup"
+                    hx-confirm="Run retroactive cleanup? This will remove excluded networks from historical logs."
+                    hx-indicator="#cleanup-spinner">
+                <span class="htmx-indicator" id="cleanup-spinner"><span class="spinner"></span></span>
+                CLEAN HISTORICAL LOGS
+            </button>
+        </div>
+    </div>
+</div>

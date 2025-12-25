@@ -32,14 +32,27 @@ NC='\033[0m' # No Color
 
 # Branch configuration for downloading scripts
 # Priority: 1) Environment variable, 2) Git branch if in repo, 3) Default to main
+#
+# IMPORTANT: To install from a specific branch, use one of these methods:
+#   sudo WARPIE_BRANCH=webapp-rebuild bash install.sh
+#   WARPIE_BRANCH=webapp-rebuild sudo -E bash install.sh
+#
 if [[ -z "${WARPIE_BRANCH:-}" ]]; then
-    # Try to detect from git if we're in a repo
-    if git rev-parse --git-dir &>/dev/null; then
-        WARPIE_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    # Get the directory where this script is located
+    _SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    _REPO_DIR="$(dirname "${_SCRIPT_DIR}")"
+
+    # Try to detect from git if we're in a repo (check parent of install/)
+    if [[ -d "${_REPO_DIR}/.git" ]] || git -C "${_REPO_DIR}" rev-parse --git-dir &>/dev/null 2>&1; then
+        WARPIE_BRANCH=$(git -C "${_REPO_DIR}" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
     else
         WARPIE_BRANCH="main"
     fi
+    unset _SCRIPT_DIR _REPO_DIR
 fi
+
+# Export for use in functions and child processes
+export WARPIE_BRANCH
 
 # Configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -1615,13 +1628,130 @@ NMCONF_EOF
 }
 
 # =============================================================================
-# CONFIGURE CONTROL PANEL
+# CONFIGURE CONTROL PANEL (Flask + HTMX)
 # =============================================================================
 configure_control_panel() {
-    log_info "Installing control panel..."
-    
-    # NOTE: CSS curly braces are doubled ({{ }}) to escape Python's .format()
-    cat > /usr/local/bin/warpie-control.py << 'CONTROL_EOF'
+    log_info "Installing Flask-based control panel..."
+
+    local branch="${WARPIE_BRANCH:-main}"
+    local base_url="https://raw.githubusercontent.com/PoppaShell/WarPie/${branch}"
+
+    # Install Python web dependencies
+    log_info "Installing Flask and Waitress..."
+    if ! pip3 install flask waitress --quiet --break-system-packages 2>/dev/null; then
+        pip3 install flask waitress --quiet 2>/dev/null || {
+            log_warn "Failed to install Flask/Waitress via pip"
+        }
+    fi
+
+    # Create installation directories
+    mkdir -p /usr/local/share/warpie/web/routes
+    mkdir -p /usr/local/share/warpie/web/templates/partials
+    mkdir -p /usr/local/share/warpie/web/static
+    mkdir -p /etc/warpie
+
+    # Download or copy web package
+    if [[ -d "${SCRIPT_DIR}/../web" ]]; then
+        log_info "Copying web package from local source..."
+        cp -r "${SCRIPT_DIR}/../web" /usr/local/share/warpie/
+    else
+        log_info "Downloading web package from ${branch} branch..."
+
+        # Core Python files
+        local web_files=(
+            "web/__init__.py"
+            "web/app.py"
+            "web/config.py"
+            "web/routes/__init__.py"
+            "web/routes/main.py"
+            "web/routes/filters.py"
+            "web/routes/targets.py"
+            "web/routes/logs.py"
+        )
+
+        # Template files
+        local template_files=(
+            "web/templates/base.html"
+            "web/templates/index.html"
+            "web/templates/partials/_status.html"
+            "web/templates/partials/_mode_buttons.html"
+            "web/templates/partials/_target_picker.html"
+            "web/templates/partials/_controls.html"
+            "web/templates/partials/_flyout_logs.html"
+            "web/templates/partials/_flyout_filters.html"
+            "web/templates/partials/_target_list_editor.html"
+            "web/templates/partials/_log_content.html"
+            "web/templates/partials/_toast.html"
+        )
+
+        # Static files
+        local static_files=(
+            "web/static/style.css"
+            "web/static/warpie.js"
+            "web/static/htmx.min.js"
+        )
+
+        # Download all files
+        for file in "${web_files[@]}" "${template_files[@]}" "${static_files[@]}"; do
+            local dest="/usr/local/share/warpie/${file}"
+            local url="${base_url}/${file}"
+            if ! curl -sSL "${url}" -o "${dest}" 2>/dev/null; then
+                log_error "Failed to download ${file}"
+                return 1
+            fi
+        done
+        log_success "Web package downloaded"
+    fi
+
+    # Download or copy entry point script
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-control" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-control" /usr/local/bin/warpie-control
+    else
+        log_info "Downloading warpie-control..."
+        if ! curl -sSL "${base_url}/bin/warpie-control" -o /usr/local/bin/warpie-control; then
+            log_error "Failed to download warpie-control"
+            return 1
+        fi
+    fi
+    chmod +x /usr/local/bin/warpie-control
+
+    # Download or copy systemd service
+    if [[ -f "${SCRIPT_DIR}/../systemd/warpie-control.service" ]]; then
+        cp "${SCRIPT_DIR}/../systemd/warpie-control.service" /etc/systemd/system/
+    else
+        log_info "Downloading warpie-control.service..."
+        if ! curl -sSL "${base_url}/systemd/warpie-control.service" -o /etc/systemd/system/warpie-control.service; then
+            # Fallback to embedded service definition
+            cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
+[Unit]
+Description=WarPie Control Panel
+Documentation=https://github.com/PoppaShell/WarPie
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/usr/local/share/warpie
+ExecStart=/usr/bin/python3 /usr/local/bin/warpie-control
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+        fi
+    fi
+
+    log_success "Control panel installed (Flask + HTMX)"
+}
+
+# Legacy embedded script removed - now uses Flask application in web/ directory
+_REMOVED_LEGACY_CONTROL_PANEL() {
+    # This function documents that the old embedded control panel has been
+    # replaced with the Flask-based implementation in web/
+    # Old code: ~500 lines of embedded Python with http.server
+    # New code: Flask + Waitress + HTMX in web/ directory
+    cat << 'CONTROL_EOF'
 #!/usr/bin/env python3
 """
 WarPie Control Panel - Kismet Mode Switcher
@@ -2115,25 +2245,7 @@ def main():
 if __name__ == '__main__':
     main()
 CONTROL_EOF
-
-    chmod +x /usr/local/bin/warpie-control.py
-    
-    cat > /etc/systemd/system/warpie-control.service << 'SERVICE_EOF'
-[Unit]
-Description=WarPie Control Panel
-After=network.target
-
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /usr/local/bin/warpie-control.py
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-SERVICE_EOF
-
-    log_success "Control panel installed"
+    : # This function is never called - just preserves old code for reference
 }
 
 # =============================================================================
@@ -2324,7 +2436,8 @@ run_tests() {
     echo "--- Scripts ---"
     test_check "network-manager.sh exists" "[[ -x /usr/local/bin/network-manager.sh ]]"
     test_check "wardrive.sh exists" "[[ -x /usr/local/bin/wardrive.sh ]]"
-    test_check "warpie-control.py exists" "[[ -x /usr/local/bin/warpie-control.py ]]"
+    test_check "warpie-control exists" "[[ -x /usr/local/bin/warpie-control ]]"
+    test_check "web package exists" "[[ -d /usr/local/share/warpie/web ]]"
     test_check "warpie-recovery.sh exists" "[[ -x /usr/local/bin/warpie-recovery.sh ]]"
     
     echo ""
@@ -2452,6 +2565,8 @@ uninstall() {
     rm -f /usr/local/bin/network-manager.sh
     rm -f /usr/local/bin/wardrive.sh
     rm -f /usr/local/bin/warpie-control.py
+    rm -f /usr/local/bin/warpie-control
+    rm -rf /usr/local/share/warpie
     rm -f /usr/local/bin/warpie-recovery.sh
     rm -f /usr/local/bin/warpie-network-manager.sh
     rm -f /usr/local/bin/warpie-exclude-ssid.sh
@@ -2654,6 +2769,9 @@ main() {
             echo "WarPie Wardriving System Installer v2.3.0"
             echo "============================================================================="
             echo ""
+            if [[ "${WARPIE_BRANCH}" != "main" ]]; then
+                log_info "Using branch: ${WARPIE_BRANCH}"
+            fi
 
             preflight_checks
             create_directories

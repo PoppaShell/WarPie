@@ -1,0 +1,15 @@
+<div class="flyout-header">
+    <h2>[STATIC EXCLUSIONS]</h2>
+    <button class="flyout-close" onclick="closeStaticManager()">[X]</button>
+</div>
+
+<div class="flyout-content">
+    <p class="section-desc">All static exclusions. These are blocked at capture time via BSSID.</p>
+
+    <div class="exclusion-list" id="static-manager-list"
+         hx-get="/api/filters/static"
+         hx-trigger="load"
+         hx-swap="innerHTML">
+        <div class="loading"><span class="spinner"></span></div>
+    </div>
+</div>

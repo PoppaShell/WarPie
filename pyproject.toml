@@ -22,6 +22,10 @@ classifiers = [
     "Topic :: Security",
     "Topic :: System :: Networking :: Monitoring",
 ]
+dependencies = [
+    "flask>=3.0",
+    "waitress>=3.0",
+]
 
 [project.urls]
 Homepage = "https://github.com/warpie/warpie"
@@ -76,21 +80,30 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["S101", "ARG", "PLR2004"]
 "bin/*" = ["S603", "S607"]
-# warpie-control.py has embedded HTML templates and intentional exception handling patterns
-# E501/W291/W293: HTML templates have long lines and formatting
-# S104: Binding to all interfaces is expected for a network-accessible web server
-# E722: Bare except is intentional for graceful web server error handling
-# PTH*: pathlib suggestions - defer to future refactor
-# PLR0911: Too many returns - acceptable for get_logs method
-# ERA001: False positives on API comment headers
-# RUF005: List concatenation style - acceptable
-"bin/warpie-control.py" = ["E501", "W291", "W293", "S104", "E722", "PTH103", "PTH119", "PTH123", "PTH207", "PLR0911", "ERA001", "RUF005"]
+# bin/warpie-control - entry point with deferred imports and all-interface binding
+"bin/warpie-control" = ["S104", "PLC0415"]
+# web/ package - Flask routes need subprocess calls and bind to all interfaces
+# PLR0911: Multiple return statements in call_filter_script for error handling clarity
+"web/*" = ["S104", "S603", "S607", "PLR0911"]
 # warpie-filter-processor.py processes files and uses os.path extensively
 # PTH*: pathlib conversion deferred - os.path is more familiar for sysadmin scripts
 # PLR0912/PLR0915: Complex functions acceptable for CLI main() and workflow functions
 # PLW2901: Loop variable reassignment is intentional for line processing
 # ARG001: signal handler frame argument required by signature
 "bin/warpie-filter-processor.py" = ["PTH103", "PTH110", "PTH111", "PTH112", "PTH113", "PTH118", "PTH119", "PTH120", "PTH123", "PTH202", "PTH204", "PTH208", "PLR0912", "PLR0915", "PLW2901", "ARG001", "SIM105"]
+# warpie-filter-manager.py is a complex CLI tool with config file parsing
+# UP045: Optional[X] style is more readable for CLI tools
+# PLW1510: subprocess.run without check= is intentional (we handle errors manually)
+# PLR0912/PLR0915: Complex config parsing functions
+# PLW2901: Loop variable reassignment for line processing
+# ERA001: Commented code is documentation for config file format
+# SIM102: Nested if statements are more readable in complex filter logic
+# SIM110: Explicit for loops are clearer for entry matching
+# PLC0415: Deferred imports reduce startup time for CLI tools
+# PTH123: open() is acceptable in complex file processing
+# E501: Long lines acceptable for user-facing messages
+# ARG002: all_static parameter reserved for future cleanup modes
+"bin/warpie-filter-manager.py" = ["UP045", "PLW1510", "PLR0912", "PLR0915", "PLW2901", "ERA001", "SIM102", "SIM110", "PLC0415", "PTH123", "E501", "ARG002"]
 
 [tool.ruff.lint.isort]
 known-first-party = ["warpie"]

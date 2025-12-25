@@ -1,0 +1,27 @@
+<button class="mode-btn {% if active_mode == 'normal' %}active{% endif %}"
+        hx-post="/api/mode"
+        hx-vals='{"mode": "normal"}'
+        hx-target="#status-panel"
+        hx-swap="innerHTML"
+        onclick="hideTargetPicker()">
+    <div class="mode-name">NORMAL</div>
+    <div class="mode-desc">Full capture</div>
+    <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
+</button>
+
+<button class="mode-btn {% if active_mode == 'wardrive' %}active{% endif %}"
+        hx-post="/api/mode"
+        hx-vals='{"mode": "wardrive"}'
+        hx-target="#status-panel"
+        hx-swap="innerHTML"
+        onclick="hideTargetPicker()">
+    <div class="mode-name">WARDRIVE</div>
+    <div class="mode-desc">AP-only</div>
+    <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
+</button>
+
+<button class="mode-btn {% if active_mode == 'targeted' %}active{% endif %}"
+        onclick="showTargetPicker()">
+    <div class="mode-name">TARGETED</div>
+    <div class="mode-desc">OUI filter</div>
+</button>

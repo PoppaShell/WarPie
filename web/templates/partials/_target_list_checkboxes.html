@@ -1,0 +1,11 @@
+{% if lists %}
+{% for list in lists %}
+<label class="target-list-item">
+    <input type="checkbox" name="target_list" value="{{ list.id }}">
+    <span class="target-list-name">{{ list.name }}</span>
+    <span class="target-list-count">[{{ list.oui_count }} OUIs]</span>
+</label>
+{% endfor %}
+{% else %}
+<div class="empty-state">No target lists available</div>
+{% endif %}
