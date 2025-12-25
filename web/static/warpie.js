@@ -178,6 +178,7 @@ function refreshLogs() {
 // PHY type state
 let currentStaticPhy = 'wifi';
 let currentDynamicPhy = 'wifi';
+let currentWifiInputMode = 'scan';  // 'scan' or 'direct'
 
 function setStaticPhy(phy) {
     currentStaticPhy = phy;
@@ -185,17 +186,29 @@ function setStaticPhy(phy) {
     document.querySelectorAll('#static-phy-selector .phy-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.phy === phy);
     });
-    // Show/hide appropriate input forms
-    const scanForm = document.querySelector('#static-ssid-input').parentElement;
+
+    const wifiModeToggle = document.getElementById('wifi-input-mode');
+    const scanForm = document.getElementById('static-scan-form');
     const directMacForm = document.getElementById('static-direct-mac-form');
+
     if (phy === 'wifi') {
-        scanForm.classList.remove('hidden');
-        directMacForm.classList.add('hidden');
+        // Show WiFi input mode toggle
+        wifiModeToggle.classList.remove('hidden');
+        // Apply current WiFi input mode
+        if (currentWifiInputMode === 'scan') {
+            scanForm.classList.remove('hidden');
+            directMacForm.classList.add('hidden');
+        } else {
+            scanForm.classList.add('hidden');
+            directMacForm.classList.remove('hidden');
+        }
     } else {
-        // BTLE/BT: show direct MAC form, hide scan (can't scan for BT easily)
+        // BTLE/BT: hide mode toggle, show direct MAC form only
+        wifiModeToggle.classList.add('hidden');
         scanForm.classList.add('hidden');
         directMacForm.classList.remove('hidden');
     }
+
     // Refresh list with PHY filter (use fetch to avoid loading indicator flash)
     fetch('/api/filters/static?limit=5&phy=' + phy, {
         headers: {'HX-Request': 'true'}
@@ -204,6 +217,25 @@ function setStaticPhy(phy) {
     .then(html => {
         document.getElementById('static-exclusion-list').innerHTML = html;
     });
+}
+
+function setWifiInputMode(mode) {
+    currentWifiInputMode = mode;
+    // Update toggle button states
+    document.querySelectorAll('#wifi-input-mode .toggle-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.mode === mode);
+    });
+
+    const scanForm = document.getElementById('static-scan-form');
+    const directMacForm = document.getElementById('static-direct-mac-form');
+
+    if (mode === 'scan') {
+        scanForm.classList.remove('hidden');
+        directMacForm.classList.add('hidden');
+    } else {
+        scanForm.classList.add('hidden');
+        directMacForm.classList.remove('hidden');
+    }
 }
 
 function setDynamicPhy(phy) {
@@ -568,8 +600,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === Mode Button Instant Highlight ===
 
-// Use direct click handler for immediate visual feedback (more reliable than htmx events)
-document.addEventListener('click', function(evt) {
+// Use mousedown for immediate visual feedback (fires before click/htmx processing)
+document.addEventListener('mousedown', function(evt) {
     // Find if click was on or inside a mode button
     const modeBtn = evt.target.closest('.mode-btn');
     if (modeBtn) {
@@ -578,6 +610,15 @@ document.addEventListener('click', function(evt) {
         modeBtn.classList.add('active');
     }
 });
+
+// Also handle touch events for mobile
+document.addEventListener('touchstart', function(evt) {
+    const modeBtn = evt.target.closest('.mode-btn');
+    if (modeBtn) {
+        document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.remove('active'));
+        modeBtn.classList.add('active');
+    }
+}, {passive: true});
 
 // === HTMX Event Handlers ===
 

@@ -18,7 +18,7 @@
         <h3 class="section-title">STATIC EXCLUSIONS</h3>
         <p class="section-desc">Block at capture time via BSSID. For networks with static MACs.</p>
 
-        <!-- Static Add Form - Needs Scan -->
+        <!-- Static Add Form -->
         <div class="add-form">
             <!-- PHY Type Selector -->
             <div class="phy-selector" id="static-phy-selector">
@@ -27,18 +27,27 @@
                 <button class="phy-btn" data-phy="bt" onclick="setStaticPhy('bt')">BT</button>
             </div>
 
-            <div class="input-row">
-                <input type="text" id="static-ssid-input" class="input" placeholder="Enter SSID to scan...">
-                <button class="btn" onclick="scanForStatic()">SCAN</button>
+            <!-- WiFi Input Mode Toggle (scan vs direct) -->
+            <div class="input-mode-toggle" id="wifi-input-mode">
+                <button class="toggle-btn active" data-mode="scan" onclick="setWifiInputMode('scan')">SCAN SSID</button>
+                <button class="toggle-btn" data-mode="direct" onclick="setWifiInputMode('direct')">ADD BSSID</button>
             </div>
 
-            <!-- Direct MAC input for BTLE/BT (hidden by default) -->
+            <!-- Scan by SSID form (default for WiFi) -->
+            <div id="static-scan-form">
+                <div class="input-row">
+                    <input type="text" id="static-ssid-input" class="input" placeholder="Enter SSID to scan...">
+                    <button class="btn" onclick="scanForStatic()">SCAN</button>
+                </div>
+            </div>
+
+            <!-- Direct MAC/BSSID input (for BTLE/BT, or WiFi direct mode) -->
             <div class="direct-mac-form hidden" id="static-direct-mac-form">
                 <div class="input-row">
-                    <input type="text" id="static-mac-input" class="input" placeholder="MAC address (AA:BB:CC:11:22:33)">
+                    <input type="text" id="static-mac-input" class="input" placeholder="MAC/BSSID (AA:BB:CC:11:22:33)">
                     <button class="btn" onclick="addDirectMAC()">ADD</button>
                 </div>
-                <input type="text" id="static-desc-input" class="input" placeholder="Description (e.g., My Apple Watch)">
+                <input type="text" id="static-desc-input" class="input" placeholder="Description (optional)">
             </div>
 
             <!-- Scan Results (hidden by default) -->

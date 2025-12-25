@@ -556,6 +556,36 @@ select option {
     margin-bottom: 10px;
 }
 
+/* Input Mode Toggle (scan vs direct) */
+.input-mode-toggle {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.input-mode-toggle .toggle-btn {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--fg-dim);
+    color: var(--fg-dim);
+    padding: 6px 10px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: calc(10px * var(--font-scale));
+    transition: all 0.1s ease;
+}
+
+.input-mode-toggle .toggle-btn:hover {
+    border-color: var(--fg);
+    color: var(--fg);
+}
+
+.input-mode-toggle .toggle-btn.active {
+    border-color: var(--fg-bright);
+    color: var(--fg-bright);
+    background: rgba(0, 255, 0, 0.1);
+}
+
 .phy-btn {
     background: var(--bg);
     border: 1px solid var(--border);
@@ -673,15 +703,17 @@ select option {
     border: 1px solid #003300;
     padding: 10px;
     font-size: calc(11px * var(--font-scale));
-    line-height: 1.5;
+    line-height: 1.4;
     max-height: 400px;
     overflow-y: auto;
-    white-space: pre-wrap;
-    word-break: break-all;
 }
 
 .log-line {
-    /* No margin - logs stack directly */
+    display: block;
+    margin: 0;
+    padding: 0;
+    white-space: pre-wrap;
+    word-break: break-all;
 }
 
 .log-line.error {

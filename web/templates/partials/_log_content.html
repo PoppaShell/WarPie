@@ -1,3 +1,1 @@
-{% for line in logs %}
-<div class="log-line {% if 'ERROR' in line or 'error' in line %}error{% elif 'WARN' in line or 'warn' in line %}warn{% elif 'INFO' in line or 'info' in line %}info{% elif 'Detected new' in line or 'advertising SSID' in line %}device{% endif %}">{{ line }}</div>
-{% endfor %}
+{% for line in logs %}<div class="log-line {% if 'ERROR' in line or 'error' in line %}error{% elif 'WARN' in line or 'warn' in line %}warn{% elif 'INFO' in line or 'info' in line %}info{% elif 'Detected new' in line or 'advertising SSID' in line %}device{% endif %}">{{ line }}</div>{% endfor %}
