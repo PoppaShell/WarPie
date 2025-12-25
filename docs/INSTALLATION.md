@@ -193,7 +193,7 @@ When away from home, WarPie creates an access point:
 
 - **SSID**: WarPie
 - **Password**: wardriving
-- **Gateway IP**: 192.168.4.1
+- **Gateway IP**: 10.0.0.1
 
 ## Adding Trusted Networks
 

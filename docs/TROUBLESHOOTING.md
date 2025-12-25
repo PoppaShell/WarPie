@@ -206,8 +206,7 @@ Look for initialization errors.
 
 #### 4. Check Permissions
 ```bash
-ls -la /home/pi/kismet/
-ls -la /var/log/kismet/
+ls -la ~/kismet/logs/
 ```
 
 ### Kismet UI Not Accessible
@@ -299,5 +298,5 @@ journalctl -u wardrive -f
 | Network Manager | `/var/log/warpie/network-manager.log` | Network decisions |
 | Wardrive | `/var/log/warpie/wardrive.log` | Kismet startup |
 | DHCP | `/var/log/warpie/dnsmasq.log` | AP mode DHCP |
-| Kismet Captures | `/home/pi/kismet/logs/` | Wireless data |
+| Kismet Captures | `~/kismet/logs/` | Wireless data |
 | System Journal | `journalctl -u <service>` | Service logs |

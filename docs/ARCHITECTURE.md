@@ -81,7 +81,7 @@ WarPie is a wardriving platform that manages:
 │                                                             │
 │    Phone/Laptop ──────► wlan0 (AP: "WarPie")               │
 │         │                    │                              │
-│         │              192.168.4.1                          │
+│         │              10.0.0.1                              │
 │         │                    │                              │
 │         └──────► Web Control (1337)                        │
 │                  Kismet UI (2501)                          │
@@ -101,7 +101,7 @@ WarPie is a wardriving platform that manages:
 
 - Creates WiFi hotspot when no home network detected
 - Provides DHCP via dnsmasq
-- Access UI at 192.168.4.1
+- Access UI at 10.0.0.1
 
 ## Service Architecture
 
@@ -222,6 +222,13 @@ WarPie is a wardriving platform that manages:
 - Management frames only
 - Optimized for mobile scanning
 
+### Targeted Mode
+
+- OUI prefix filtering
+- Target specific device manufacturers
+- Uses custom target lists
+- Research/testing scenarios
+
 ## File System Layout
 
 ```
@@ -248,10 +255,11 @@ WarPie is a wardriving platform that manages:
 ├── wardrive.log
 └── dnsmasq.log
 
-/home/pi/kismet/                # Capture data
+~/kismet/                       # Capture data
 └── logs/
     ├── normal/
-    └── wardrive/
+    ├── wardrive/
+    └── targeted/
 ```
 
 ## Network Filtering

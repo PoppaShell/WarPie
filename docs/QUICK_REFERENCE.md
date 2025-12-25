@@ -15,9 +15,9 @@ SSH:            ssh pi@<pi-ip>
 ```
 WiFi SSID:      WarPie
 Password:       wardriving
-Control Panel:  http://192.168.4.1:1337
-Kismet UI:      http://192.168.4.1:2501
-SSH:            ssh pi@192.168.4.1
+Control Panel:  http://10.0.0.1:1337
+Kismet UI:      http://10.0.0.1:2501
+SSH:            ssh pi@10.0.0.1
 ```
 
 ---

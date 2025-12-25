@@ -1,138 +1,162 @@
 # WarPie - Raspberry Pi Wardriving Platform
 
-A complete wardriving system for Raspberry Pi 4B with dual-band WiFi capture, BTLE scanning, GPS logging, and automatic network management.
+A complete wardriving and wireless research platform for Raspberry Pi OS, featuring multi-adapter WiFi capture, GPS logging, and a mobile-optimized web interface.
 
 ## Features
 
-- **Dual-Band WiFi Capture**: Simultaneous 2.4GHz and 5/6GHz WiFi monitoring
-- **BTLE Support**: Optional Bluetooth Low Energy scanning with TI CC2540
-- **GPS Integration**: Location logging with GlobalSat BU-353S4 (or compatible)
-- **Auto Network Switching**: Connects to home WiFi when in range, creates AP when mobile
-- **Web Control Panel**: Flask-based control interface with cyberpunk terminal theme (port 1337)
-- **Network Filtering**: Static exclusions (MAC-based) and dynamic exclusions (SSID-based)
-- **Interactive Setup**: Guided configuration for home networks and exclusions
+- **Multi-Adapter WiFi Capture**: Balance channels across multiple adapters with per-adapter band configuration
+- **GPS Integration**: Location-tagged network logging for mapping and analysis
+- **Automatic Network Switching**: Seamlessly switches between home WiFi and mobile access point
+- **Web Control Panel**: Flask-based mobile interface with cyberpunk terminal theme (port 1337)
+- **Network Filtering**: Static exclusions (MAC-based) and dynamic exclusions (pattern-based with wildcards)
 - **Multiple Capture Modes**:
-  - **Normal**: Full capture with home network exclusion
-  - **Wardrive**: Optimized AP-only scanning for mobile use
+  - **Normal**: Full device capture with exclusions applied
+  - **Wardrive**: AP-only optimized scanning for mobile use
+  - **Targeted**: Target specific device manufacturers by OUI prefix
+- **Optional BTLE Scanning**: Bluetooth Low Energy capture with supported adapters
 
-## Hardware Requirements
+## Minimum Requirements
 
-- Raspberry Pi 4B (4GB+ recommended)
-- USB WiFi Adapter 1: ALFA AWUS036AXML (5GHz/6GHz)
-- USB WiFi Adapter 2: RT3070-based (2.4GHz)
-- GPS: GlobalSat BU-353S4 or similar USB GPS
-- Optional: TI CC2540 BTLE adapter
-- Power: 5V 3A USB-C power supply
-- Storage: 32GB+ microSD card
+| Component    | Requirement                                        |
+| ------------ | -------------------------------------------------- |
+| Platform     | Raspberry Pi 4B or newer                           |
+| OS           | Raspberry Pi OS (64-bit recommended)               |
+| GPS          | Any gpsd-compatible USB GPS receiver               |
+| WiFi Adapter | At least one Kismet-supported monitor-mode adapter |
+| Power        | 5V 3A USB-C (sufficient for Pi + adapters)         |
+| Storage      | 32GB+ microSD (larger for extended captures)       |
+
+### Optional Hardware
+
+- **Additional WiFi adapters** for multi-band coverage
+- **BTLE adapter** (e.g., TI CC2540) for Bluetooth scanning
 
 ## Quick Start
 
-For detailed installation instructions, see [docs/INSTALLATION.md](docs/INSTALLATION.md).
+### Option 1: Clone and Install
 
 ```bash
-# Copy install.sh to your Pi
-scp install/install.sh pi@warpie:~/
-
-# SSH in and run installer
-ssh pi@warpie
-chmod +x install.sh
-sudo ./install.sh
+git clone https://github.com/PoppaShell/WarPie.git
+cd WarPie
+sudo ./install/install.sh
 ```
 
-The installer will guide you through:
-1. **Home Network Setup** - Enter your WiFi SSID, it auto-discovers all BSSIDs
-2. **Kismet Exclusions** - Choose to exclude home network from wardriving logs
-3. **Additional Exclusions** - Optionally exclude neighbor/work networks
+### Option 2: Release Tarball (Coming Soon)
 
-## Usage
+*See [Issue #10](https://github.com/PoppaShell/WarPie/issues/10) for streamlined installation via release packages.*
+
+The installer will guide you through:
+
+1. WiFi adapter configuration (AP vs capture, bands, channels)
+2. Home network BSSID discovery
+3. Optional network exclusions
+4. GPS device detection
+
+### After Installation
+
+1. **Reboot** to start all services: `sudo reboot`
+2. **Access Control Panel**: `http://<pi-ip>:1337`
+3. **Access Kismet UI**: `http://<pi-ip>:2501`
 
 ### Installation Options
 
 ```bash
-sudo ./install.sh              # Full install with interactive setup
-sudo ./install.sh --test       # Validate installation (26 checks)
-sudo ./install.sh --configure  # Re-run WiFi and filter configuration
-sudo ./install.sh --uninstall  # Remove WarPie
-sudo ./install.sh --help       # Show help
+sudo ./install/install.sh              # Full install with interactive setup
+sudo ./install/install.sh --test       # Validate installation (26 checks)
+sudo ./install/install.sh --configure  # Re-run WiFi and filter configuration
+sudo ./install/install.sh --uninstall  # Remove WarPie
+sudo ./install/install.sh --help       # Show help
 ```
 
-### After Installation
+## AP Mode (Mobile)
 
-1. **Access Control Panel**: Browse to `http://<pi-ip>:1337`
-2. **Access Kismet UI**: Browse to `http://<pi-ip>:2501`
-3. **Reboot** to start all services: `sudo reboot`
+When away from configured home networks, WarPie creates an access point:
 
-### AP Mode (Mobile)
-
-When away from home networks, WarPie creates an access point:
 - **SSID**: WarPie
 - **Password**: wardriving
-- **IP**: 192.168.4.1
+- **IP**: 10.0.0.1
 
 Connect to this network to access the control panel and Kismet UI while mobile.
 
-## Kismet Modes
+## Capture Modes
 
 ### Normal Mode
-Full device capture with home network exclusion. Good for stationary monitoring.
+
+Full device capture (APs and clients) with exclusion filters applied. Best for stationary monitoring.
 
 ### Wardrive Mode
+
 Optimized for mobile scanning:
+
 - AP-only tracking (no clients)
 - Faster channel hopping (150ms dwell)
 - Management frames only
 - Lower CPU/memory usage
 
+### Targeted Mode
+
+Target specific device manufacturers by OUI prefix:
+
+- Create custom target lists with OUI patterns (format: `XX:XX:XX:*`)
+- Select one or more lists per capture session
+- Capture only devices matching the patterns
+
 ## Network Filtering
 
-WarPie supports two filtering paradigms for excluding unwanted networks:
-
 ### Static Exclusions
-For networks with stable MAC addresses (home, neighbors, corporate):
-- Discovers BSSIDs from SSID
-- Adds to Kismet blocklist
-- Blocked at capture time (most efficient)
+
+Block networks at capture time via BSSID. For networks with stable MAC addresses (home routers, corporate APs). Discovers BSSIDs from SSID scanning.
 
 ### Dynamic Exclusions
-For networks with rotating MAC addresses (iPhone hotspots, Android):
-- Stores SSID pattern only
-- Post-processing removal by filter processor daemon
-- Never adds to MAC blocklist (MACs rotate)
+
+Removed during post-processing. For networks with rotating MACs. Wildcards supported:
+
+- `Guest*` - matches Guest, Guest-5G
+- `*Hotspot` - matches MyHotspot
+- `Net?ork` - matches Network, Netw0rk
 
 ## Configuration Files
 
-| File | Location | Purpose |
-|------|----------|---------|
-| Known BSSIDs | `/etc/warpie/known_bssids.conf` | Home network list for AP switching |
-| Filter Rules | `/etc/warpie/filter_rules.conf` | Static/dynamic exclusion rules |
-| Adapter Config | `/etc/warpie/adapters.conf` | WiFi adapter band/channel settings |
-| Kismet Site | `/etc/kismet/kismet_site.conf` | GPS config, exclusion filters |
-| Wardrive Mode | `/etc/kismet/kismet_wardrive.conf` | Optimized scanning settings |
+| File            | Location                          | Purpose                          |
+| --------------- | --------------------------------- | -------------------------------- |
+| Adapter Config  | `/etc/warpie/adapters.conf`       | Per-adapter band/channel settings |
+| Known BSSIDs    | `/etc/warpie/known_bssids.conf`   | Home networks for AP switching   |
+| Filter Rules    | `/etc/warpie/filter_rules.conf`   | Exclusions and target lists      |
+| Kismet Site     | `/etc/kismet/kismet_site.conf`    | Main Kismet config + GPS         |
+| Kismet Wardrive | `/etc/kismet/kismet_wardrive.conf` | Wardrive/Targeted optimizations  |
 
 ## Services
 
-| Service | Purpose |
-|---------|---------|
-| `gpsd-wardriver` | GPS daemon |
-| `warpie-network` | Auto AP/client switching |
-| `wardrive` | Kismet capture |
-| `warpie-control` | Web control panel (port 1337) |
-| `warpie-filter-processor` | Dynamic exclusion post-processing |
+| Service                   | Purpose                            |
+| ------------------------- | ---------------------------------- |
+| `gpsd-wardriver`          | GPS daemon for location tagging    |
+| `warpie-network`          | Auto AP/client network switching   |
+| `wardrive`                | Kismet capture (all modes)         |
+| `warpie-control`          | Web control panel (port 1337)      |
+| `warpie-filter-processor` | Dynamic exclusion post-processing  |
 
-### Service Commands
+## Service Commands
 
 ```bash
 # View service status
-systemctl status wardrive
+systemctl status wardrive warpie-control warpie-network
 
-# View logs
+# View live logs
 journalctl -u wardrive -f
 
-# Restart Kismet
+# Restart capture
 sudo systemctl restart wardrive
 
 # Recovery (restore normal WiFi)
-sudo warpie-recovery.sh
+sudo systemctl stop warpie-network
+sudo ip link set wlan0 down
+```
+
+### Enable Persistent Logs (Recommended for Troubleshooting)
+
+```bash
+sudo mkdir -p /var/log/journal
+sudo systemctl restart systemd-journald
 ```
 
 ## Filter Management
@@ -145,7 +169,7 @@ sudo warpie-filter-manager.py --list
 sudo warpie-filter-manager.py --add-static "HomeNetwork"
 
 # Add dynamic exclusion (rotating MAC network)
-sudo warpie-filter-manager.py --add-dynamic "iPhone-*"
+sudo warpie-filter-manager.py --add-dynamic "Guest*"
 
 # JSON mode for scripting
 sudo warpie-filter-manager.py --json --list
@@ -156,10 +180,11 @@ sudo warpie-filter-manager.py --json --list
 To change your home network or exclusions after installation:
 
 ```bash
-sudo ./install.sh --configure
+sudo ./install/install.sh --configure
 ```
 
 This lets you:
+
 - Change home network SSID
 - Add/remove Kismet exclusions
 - Scan for new networks
@@ -169,6 +194,7 @@ This lets you:
 For detailed troubleshooting, see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
 ### GPS Not Working
+
 ```bash
 # Check GPS device
 ls -la /dev/ttyUSB*
@@ -182,6 +208,7 @@ systemctl status gpsd-wardriver
 ```
 
 ### WiFi Adapters Not Found
+
 ```bash
 # List adapters
 iw dev
@@ -194,6 +221,7 @@ dmesg | grep -i wifi
 ```
 
 ### Control Panel Not Accessible
+
 ```bash
 # Check service
 systemctl status warpie-control
@@ -206,6 +234,7 @@ curl http://localhost:1337
 ```
 
 ### Can't Connect to AP Mode
+
 ```bash
 # Check hostapd
 journalctl -u warpie-network
@@ -216,40 +245,59 @@ sudo warpie-recovery.sh
 
 ## WiGLE Upload
 
-Kismet creates WiGLE-compatible CSV files in `/home/pi/kismet/`. Upload these to [wigle.net](https://wigle.net) to contribute to the wireless network database.
+Kismet creates WiGLE-compatible CSV files organized by mode and date:
 
-## Documentation
+```text
+~/kismet/logs/<mode>/<date>/*.wiglecsv
+```
 
-| Document | Description |
-|----------|-------------|
-| [INSTALLATION.md](docs/INSTALLATION.md) | Detailed setup guide |
-| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) | Diagnostic procedures |
-| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | System design |
-| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md) | Field reference card |
+Upload these to [wigle.net](https://wigle.net) to contribute to the wireless network database.
 
 ## Project Structure
 
-```
-/etc/warpie/                    # Configuration
-  known_bssids.conf             # Home network BSSIDs
-  filter_rules.conf             # Exclusion/targeting rules
+```text
+/etc/warpie/                    # WarPie configuration
   adapters.conf                 # WiFi adapter settings
+  known_bssids.conf             # Home network BSSIDs
+  filter_rules.conf             # Exclusions and target lists
 
-/etc/kismet/                    # Kismet configs
-  kismet_site.conf              # Main config + exclusions
-  kismet_wardrive.conf          # Wardrive mode
+/etc/kismet/                    # Kismet configuration
+  kismet_site.conf              # Main config + GPS
+  kismet_wardrive.conf          # Wardrive/Targeted mode
 
-/usr/local/bin/                 # Scripts
+/usr/local/bin/                 # Executable scripts
   warpie-network-manager.sh     # AP/client switching
   wardrive.sh                   # Kismet launcher
   warpie-control                # Web control panel
   warpie-filter-manager.py      # Filter CLI tool
   warpie-filter-processor.py    # Post-processing daemon
-  warpie-recovery.sh            # Emergency recovery
 
-/var/log/warpie/                # Logs
-/home/pi/kismet/                # Capture files
+/var/log/warpie/                # Application logs
+~/kismet/logs/                  # Kismet capture files
 ```
+
+## Documentation
+
+| Document                                             | Description            |
+| ---------------------------------------------------- | ---------------------- |
+| [INSTALLATION.md](docs/INSTALLATION.md)              | Detailed setup guide   |
+| [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)        | Diagnostic procedures  |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md)              | System design          |
+| [QUICK_REFERENCE.md](docs/QUICK_REFERENCE.md)        | Field reference card   |
+
+## Tested Hardware
+
+The following hardware has been tested with WarPie:
+
+| Component      | Model                  | Notes                       |
+| -------------- | ---------------------- | --------------------------- |
+| SBC            | Raspberry Pi 4B (4GB)  | Primary development platform |
+| WiFi (5/6GHz)  | ALFA AWUS036AXML       | mt7921u driver              |
+| WiFi (2.4GHz)  | RT3070-based adapter   | rt2800usb driver            |
+| GPS            | GlobalSat BU-353S4     | USB GPS receiver            |
+| BTLE           | TI CC2540              | Optional, for BLE scanning  |
+
+Other Kismet-supported adapters should work. See [Kismet documentation](https://www.kismetwireless.net/) for compatibility.
 
 ## License
 
@@ -258,6 +306,7 @@ GPL-3.0-or-later
 ## Credits
 
 Built with:
+
 - [Kismet](https://www.kismetwireless.net/) - Wireless network detector
 - [gpsd](https://gpsd.gitlab.io/gpsd/) - GPS daemon
 - [Flask](https://flask.palletsprojects.com/) - Web framework
