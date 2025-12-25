@@ -6,7 +6,7 @@ set -e
 
 LOG_FILE="/var/log/warpie/wardrive.log"
 ADAPTERS_CONF="/etc/warpie/adapters.conf"
-KISMET_BASE="${HOME}/kismet"
+KISMET_BASE="/var/log/kismet"
 
 # Standard WiFi Channel Lists (for expanding "all")
 readonly CHANNELS_5_ALL="36,40,44,48,52,56,60,64,100,104,108,112,116,120,124,128,132,136,140,144,149,153,157,161,165"

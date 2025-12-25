@@ -763,9 +763,10 @@ create_directories() {
     
     mkdir -p "$WARPIE_DIR"
     mkdir -p "$LOG_DIR"
-    mkdir -p "/home/${WARPIE_USER}/kismet"
-    
-    chown -R "${WARPIE_USER}:${WARPIE_USER}" "/home/${WARPIE_USER}/kismet"
+    mkdir -p /var/log/kismet/logs
+
+    chown -R root:kismet /var/log/kismet
+    chmod -R 775 /var/log/kismet
     
     log_success "Directories created"
 }
@@ -1531,7 +1532,7 @@ Environment=KISMET_MODE=normal
 ExecStart=/usr/local/bin/wardrive.sh
 Restart=on-failure
 RestartSec=10
-WorkingDirectory=/home/${WARPIE_USER}/kismet
+WorkingDirectory=/var/log/kismet
 
 [Install]
 WantedBy=multi-user.target
@@ -2122,11 +2123,11 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
                 if mode_dir == 'stopped':
                     mode_dir = 'normal'
                 today = date.today().strftime('%Y-%m-%d')
-                pattern = f'/home/pi/kismet/logs/{mode_dir}/{today}/*.wiglecsv'
+                pattern = f'/var/log/kismet/logs/{mode_dir}/{today}/*.wiglecsv'
                 files = glob.glob(pattern)
                 if not files:
                     # Try finding any wiglecsv
-                    pattern = f'/home/pi/kismet/logs/*/{today}/*.wiglecsv'
+                    pattern = f'/var/log/kismet/logs/*/{today}/*.wiglecsv'
                     files = glob.glob(pattern)
                 if not files:
                     return [f'No WiGLE CSV found for today ({today})', f'Pattern: {pattern}', '', 'Waiting for Kismet to create log file...']

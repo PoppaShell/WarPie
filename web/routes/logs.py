@@ -12,7 +12,7 @@ logs_bp = Blueprint("logs", __name__)
 def _get_wigle_logs(lines: int) -> list[str]:
     """Get WiGLE CSV log content."""
     today = date.today().strftime("%Y-%m-%d")
-    log_base = Path("/home/pi/kismet/logs")
+    log_base = Path("/var/log/kismet/logs")
 
     # Find today's WiGLE CSV files
     files = list(log_base.glob(f"*/{today}/*.wiglecsv"))
