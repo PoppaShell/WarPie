@@ -1,39 +1,41 @@
 # WarPie Installation Guide
 
-Detailed installation instructions for WarPie on Raspberry Pi 4B.
+Complete installation guide for WarPie on Raspberry Pi.
 
 ## Prerequisites
 
-### Required Hardware
+### Minimum Requirements
 
-| Component | Model | Purpose |
-|-----------|-------|---------|
-| Raspberry Pi | 4B (4GB+ recommended) | Main platform |
-| WiFi Adapter 1 | ALFA AWUS036AXML | 5GHz/6GHz monitor |
-| WiFi Adapter 2 | RT3070-based | 2.4GHz monitor |
-| GPS | GlobalSat BU-353S4 | Location tracking |
-| Power | 5V 3A USB-C | Reliable power |
-| Storage | 32GB+ microSD | OS and logs |
+| Component    | Requirement                                        |
+| ------------ | -------------------------------------------------- |
+| Platform     | Raspberry Pi 4B or newer                           |
+| OS           | Raspberry Pi OS (64-bit recommended)               |
+| GPS          | Any gpsd-compatible USB GPS receiver               |
+| WiFi Adapter | At least one Kismet-supported monitor-mode adapter |
+| Power        | 5V 3A USB-C (sufficient for Pi + adapters)         |
+| Storage      | 32GB+ microSD (larger for extended captures)       |
 
 ### Optional Hardware
 
-| Component | Model | Purpose |
-|-----------|-------|---------|
-| BTLE Adapter | TI CC2540 | Bluetooth Low Energy scanning |
+- **Additional WiFi adapters** for multi-band coverage (2.4GHz + 5GHz + 6GHz)
+- **BTLE adapter** (e.g., TI CC2540) for Bluetooth Low Energy scanning
 
 ### WiFi Interface Mapping
 
-| Interface | Device | Bands | Purpose |
-|-----------|--------|-------|---------|
-| wlan0 | Onboard RPi | 2.4/5GHz | Home network / AP |
-| wlan1 | AWUS036AXML | 5/6GHz | Kismet monitor |
-| wlan2 | RT3070 | 2.4GHz | Kismet monitor |
+The installer auto-detects adapters and lets you assign roles:
+
+| Role | Purpose | Example |
+|------|---------|---------|
+| AP Interface | Home WiFi client / Mobile AP | Onboard wlan0 |
+| Capture Interface(s) | Kismet monitor mode | USB adapters |
+
+You'll configure bands and channels per adapter during installation.
 
 ## Installation Methods
 
 ### Option 1: Release Tarball (Recommended)
 
-Download the latest release tarball - smaller and includes only runtime files:
+Download the latest release - smaller and includes only runtime files (~128KB):
 
 ```bash
 # Download and extract
@@ -45,7 +47,7 @@ sudo ./install/install.sh
 
 ### Option 2: Git Clone
 
-Clone the full repository (includes development files):
+Clone the full repository (includes development files, tests, CI):
 
 ```bash
 git clone https://github.com/PoppaShell/WarPie.git
@@ -53,42 +55,92 @@ cd WarPie
 sudo ./install/install.sh
 ```
 
+Use this if you want to contribute or need the full development environment.
+
 ### Installer Options
-
-The installer guides you through:
-
-1. Home network SSID and password
-2. BSSID discovery for your home APs
-3. Kismet exclusion configuration
-4. Optional neighbor network exclusions
 
 ```bash
 sudo ./install/install.sh              # Full install with interactive setup
 sudo ./install/install.sh --test       # Validate installation (26 checks)
 sudo ./install/install.sh --configure  # Re-run WiFi and filter configuration
 sudo ./install/install.sh --uninstall  # Remove WarPie
+sudo ./install/install.sh --help       # Show all options
 ```
 
-### Manual Installation
+## Interactive Setup
 
-#### 1. Install Dependencies
+The installer guides you through:
+
+1. **WiFi Adapter Configuration**
+   - Select AP interface (for home WiFi and mobile AP)
+   - Select capture interface(s) for Kismet
+   - Configure bands per adapter (2.4GHz, 5GHz, 6GHz)
+   - Set channel lists or use defaults
+
+2. **Home Network Setup**
+   - Enter home WiFi SSID and password
+   - Discover BSSIDs for your home APs (supports mesh networks)
+   - Configure Kismet exclusions for home networks
+
+3. **Optional Configuration**
+   - Add neighbor network exclusions
+   - Configure BTLE adapter (if detected)
+   - Set Kismet auto-start mode (wardrive/normal/targeted)
+
+## Post-Installation
+
+### Verify Installation
+
+```bash
+sudo ./install/install.sh --test
+```
+
+This runs 26 validation checks covering services, configs, and permissions.
+
+### Reboot
+
+```bash
+sudo reboot
+```
+
+Services start automatically after reboot.
+
+### Access Points
+
+| Service       | URL                       | Purpose                       |
+| ------------- | ------------------------- | ----------------------------- |
+| Control Panel | `http://<pi-ip>:1337`     | Mode switching, logs, filters |
+| Kismet UI     | `http://<pi-ip>:2501`     | Network viewer                |
+
+### Default AP Credentials
+
+When away from home networks, WarPie creates an access point:
+
+- **SSID**: WarPie
+- **Password**: wardriving
+- **Gateway IP**: 10.0.0.1
+
+## Manual Installation
+
+For advanced users who want to understand or customize the setup.
+
+### 1. Install Dependencies
 
 ```bash
 sudo apt update
 sudo apt install -y gpsd gpsd-clients kismet hostapd dnsmasq python3-pip
-pip3 install flask waitress
+pip3 install flask waitress inquirerpy rich
 ```
 
-#### 2. Configure Udev Rules
+### 2. Configure Udev Rules
 
-Create `/etc/udev/rules.d/70-persistent-wifi.rules`:
+Create `/etc/udev/rules.d/70-warpie-wifi.rules` to pin interface names by MAC:
 
 ```bash
-# Map MAC addresses to consistent interface names
 # Replace with your actual MAC addresses
-SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="d8:3a:dd:6c:0e:c1", NAME="wlan0"
-SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:c0:ca:b8:ff:ac", NAME="wlan1"
-SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="00:c0:ca:89:21:7e", NAME="wlan2"
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="xx:xx:xx:xx:xx:xx", NAME="wlan0"
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="yy:yy:yy:yy:yy:yy", NAME="wlan1"
+SUBSYSTEM=="net", ACTION=="add", ATTR{address}=="zz:zz:zz:zz:zz:zz", NAME="wlan2"
 ```
 
 Apply the rules:
@@ -98,7 +150,7 @@ sudo udevadm control --reload-rules
 sudo udevadm trigger
 ```
 
-#### 3. Create Configuration Directory
+### 3. Create Directories
 
 ```bash
 sudo mkdir -p /etc/warpie
@@ -108,22 +160,22 @@ sudo chown -R root:kismet /var/log/kismet
 sudo chmod -R 775 /var/log/kismet
 ```
 
-#### 4. Configure Known BSSIDs
+### 4. Configure Known BSSIDs
 
 Create `/etc/warpie/known_bssids.conf`:
 
-```
+```text
 # Format: BSSID|SSID|PRIORITY|DESCRIPTION
 # Higher priority = preferred connection
 94:2a:6f:0c:ed:85|HomeNetwork|10|Primary router - 5GHz
 74:83:c2:8a:23:4c|HomeNetwork|20|Mesh node - 2.4GHz
 ```
 
-#### 5. Configure WPA Supplicant
+### 5. Configure WPA Supplicant
 
 Create `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`:
 
-```
+```ini
 ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
 update_config=1
 country=US
@@ -137,11 +189,11 @@ network={
 }
 ```
 
-#### 6. Configure hostapd (AP Mode)
+### 6. Configure hostapd (AP Mode)
 
 Create `/etc/hostapd/hostapd-wlan0.conf`:
 
-```
+```ini
 interface=wlan0
 driver=nl80211
 ssid=WarPie
@@ -157,7 +209,7 @@ wpa_key_mgmt=WPA-PSK
 rsn_pairwise=CCMP
 ```
 
-#### 7. Install Scripts
+### 7. Install Scripts
 
 ```bash
 sudo cp bin/warpie-network-manager.sh /usr/local/bin/
@@ -170,9 +222,7 @@ sudo chmod +x /usr/local/bin/warpie-*
 sudo chmod +x /usr/local/bin/wardrive.sh
 ```
 
-#### 8. Configure Systemd Services
-
-Install service units and enable:
+### 8. Configure Systemd Services
 
 ```bash
 sudo cp systemd/*.service /etc/systemd/system/
@@ -185,36 +235,11 @@ sudo systemctl enable warpie-control
 sudo systemctl enable warpie-filter-processor
 ```
 
-#### 9. Reboot
+### 9. Reboot
 
 ```bash
 sudo reboot
 ```
-
-## Post-Installation
-
-### Verify Installation
-
-```bash
-sudo ./install.sh --test
-```
-
-This runs 26 validation checks on your installation.
-
-### Access Points
-
-| Service | URL | Purpose |
-|---------|-----|---------|
-| Control Panel | http://<pi-ip>:1337 | Mode switching, logs, filters |
-| Kismet UI | http://<pi-ip>:2501 | Network viewer |
-
-### Default AP Credentials
-
-When away from home, WarPie creates an access point:
-
-- **SSID**: WarPie
-- **Password**: wardriving
-- **Gateway IP**: 10.0.0.1
 
 ## Adding Trusted Networks
 
@@ -228,13 +253,13 @@ When away from home, WarPie creates an access point:
 
 2. Add to `/etc/warpie/known_bssids.conf`:
 
-   ```
+   ```text
    XX:XX:XX:XX:XX:XX|HomeNetwork|20|Mesh node - upstairs
    ```
 
 3. Add to `/etc/wpa_supplicant/wpa_supplicant-wlan0.conf`:
 
-   ```
+   ```ini
    network={
        ssid="HomeNetwork"
        bssid=XX:XX:XX:XX:XX:XX
@@ -255,20 +280,64 @@ When away from home, WarPie creates an access point:
 To change settings after installation:
 
 ```bash
-sudo ./install.sh --configure
+sudo ./install/install.sh --configure
 ```
 
 This lets you:
 
-- Change home network SSID
+- Change home network SSID/password
+- Re-scan for WiFi adapters
 - Update Kismet exclusions
-- Scan for new networks
 - Add additional trusted BSSIDs
+- Change startup mode
 
 ## Uninstallation
 
 ```bash
-sudo ./install.sh --uninstall
+sudo ./install/install.sh --uninstall
 ```
 
 This removes all WarPie configurations and restores default networking.
+
+## Troubleshooting Installation
+
+### Enable Persistent Journal Logs
+
+For debugging issues that persist across reboots:
+
+```bash
+sudo mkdir -p /var/log/journal
+sudo sed -i 's/#Storage=auto/Storage=persistent/' /etc/systemd/journald.conf
+sudo systemctl restart systemd-journald
+```
+
+Then view logs with:
+
+```bash
+journalctl -u warpie-network -u wardrive -u warpie-control --since "1 hour ago"
+```
+
+### Common Issues
+
+| Issue | Solution |
+|-------|----------|
+| Adapters not detected | Ensure USB adapters are connected before running installer |
+| Kismet won't start | Run `sudo make suidinstall` in Kismet source directory |
+| GPS not working | Check `/dev/ttyUSB0` exists, verify with `gpsmon` |
+| AP mode not starting | Verify hostapd config, check `journalctl -u warpie-network` |
+
+See [TROUBLESHOOTING.md](TROUBLESHOOTING.md) for detailed diagnostic procedures.
+
+## Tested Hardware
+
+The following hardware has been verified with WarPie:
+
+| Component      | Model                  | Driver      | Notes                        |
+| -------------- | ---------------------- | ----------- | ---------------------------- |
+| SBC            | Raspberry Pi 4B (4GB)  | -           | Primary development platform |
+| WiFi (5/6GHz)  | ALFA AWUS036AXML       | mt7921u     | Excellent 6GHz support       |
+| WiFi (2.4GHz)  | RT3070-based adapter   | rt2800usb   | Reliable 2.4GHz monitor mode |
+| GPS            | GlobalSat BU-353S4     | -           | USB GPS, works with gpsd     |
+| BTLE           | TI CC2540              | -           | Optional, for BLE scanning   |
+
+Other Kismet-supported adapters should work. See [Kismet documentation](https://www.kismetwireless.net/) for compatibility lists.
