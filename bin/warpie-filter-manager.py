@@ -301,8 +301,15 @@ class FilterManager:
                         line = line.strip()
 
                         # Check for WARPIE_FILTER comment with context
-                        if line.startswith("# WARPIE_FILTER:"):
-                            filter_context = line.replace("# WARPIE_FILTER:", "").strip()
+                        # Supports two formats:
+                        #   Old: # WARPIE_FILTER: SSID
+                        #   New: # WARPIE_FILTER (PHY): SSID
+                        if line.startswith("# WARPIE_FILTER"):
+                            if ": " in line:
+                                # Extract context after the colon
+                                filter_context = line.split(": ", 1)[1].strip()
+                            else:
+                                filter_context = ""
                             continue
 
                         # Check for home network exclusions comment
