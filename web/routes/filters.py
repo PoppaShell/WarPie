@@ -1,12 +1,15 @@
 """WarPie Web Control Panel - Network Filter (Exclusions) Routes."""
 
 import json
+import logging
 import subprocess
 from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request
 
 from web.config import EXCLUDE_SCRIPT, FILTER_MANAGER_SCRIPT, FILTER_PROCESSOR_SCRIPT
+
+logger = logging.getLogger(__name__)
 
 filters_bp = Blueprint("filters", __name__)
 
@@ -43,7 +46,8 @@ def call_filter_script(*args) -> dict:
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Script timeout"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error("Filter script error: %s", e, exc_info=True)
+        return {"success": False, "error": "An internal error occurred"}
 
 
 def call_processor_script(*args) -> dict:
@@ -69,7 +73,8 @@ def call_processor_script(*args) -> dict:
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Script timeout"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error("Filter script error: %s", e, exc_info=True)
+        return {"success": False, "error": "An internal error occurred"}
 
 
 @filters_bp.route("/filters")
@@ -292,7 +297,8 @@ def api_processor_status():
             return jsonify({"running": True, "pid": pid})
         return jsonify({"running": False, "pid": None})
     except Exception as e:
-        return jsonify({"running": False, "pid": None, "error": str(e)})
+        logger.error("Error checking processor status: %s", e, exc_info=True)
+        return jsonify({"running": False, "pid": None, "error": "An internal error occurred"})
 
 
 @filters_bp.route("/scan-ssid")

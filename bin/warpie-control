@@ -49,11 +49,6 @@ def main() -> None:
         default=2,
         help="Number of worker threads (default: 2)",
     )
-    parser.add_argument(
-        "--debug",
-        action="store_true",
-        help="Run in debug mode with Flask development server",
-    )
     args = parser.parse_args()
 
     # Import here to avoid issues if waitress not installed
@@ -64,19 +59,15 @@ def main() -> None:
     print("WarPie Control Panel v3.0.0")
     print(f"Running on http://{args.host}:{args.port}")
 
-    if args.debug:
-        # Use Flask dev server for debugging
-        app.run(host=args.host, port=args.port, debug=True)
-    else:
-        # Use Waitress for production
-        try:
-            from waitress import serve
+    # Use Waitress for production
+    try:
+        from waitress import serve
 
-            serve(app, host=args.host, port=args.port, threads=args.threads)
-        except ImportError:
-            print("Warning: Waitress not installed, using Flask dev server")
-            print("Install with: pip install waitress")
-            app.run(host=args.host, port=args.port, debug=False)
+        serve(app, host=args.host, port=args.port, threads=args.threads)
+    except ImportError:
+        print("Warning: Waitress not installed, using Flask dev server")
+        print("Install with: pip install waitress")
+        app.run(host=args.host, port=args.port, debug=False)
 
 
 if __name__ == "__main__":
