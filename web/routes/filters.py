@@ -1,12 +1,15 @@
 """WarPie Web Control Panel - Network Filter (Exclusions) Routes."""
 
 import json
+import logging
 import subprocess
 from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request
 
 from web.config import EXCLUDE_SCRIPT, FILTER_MANAGER_SCRIPT, FILTER_PROCESSOR_SCRIPT
+
+logger = logging.getLogger(__name__)
 
 filters_bp = Blueprint("filters", __name__)
 
@@ -31,7 +34,9 @@ def call_filter_script(*args) -> dict:
         return {"success": False, "error": "No filter manager script found"}
 
     try:
-        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
+        result = subprocess.run(
+            cmd, check=False, capture_output=True, text=True, timeout=30
+        )
         if result.stdout.strip():
             return json.loads(result.stdout)
         # Check stderr for error messages
@@ -43,7 +48,8 @@ def call_filter_script(*args) -> dict:
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Script timeout"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error("Filter script error: %s", e, exc_info=True)
+        return {"success": False, "error": "An internal error occurred"}
 
 
 def call_processor_script(*args) -> dict:
@@ -60,7 +66,9 @@ def call_processor_script(*args) -> dict:
 
     try:
         cmd = ["python3", FILTER_PROCESSOR_SCRIPT, "--json", *args]
-        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(
+            cmd, check=False, capture_output=True, text=True, timeout=60
+        )
         if result.stdout.strip():
             return json.loads(result.stdout)
         return {"success": False, "error": "No output from processor"}
@@ -69,7 +77,8 @@ def call_processor_script(*args) -> dict:
     except subprocess.TimeoutExpired:
         return {"success": False, "error": "Script timeout"}
     except Exception as e:
-        return {"success": False, "error": str(e)}
+        logger.error("Filter script error: %s", e, exc_info=True)
+        return {"success": False, "error": "An internal error occurred"}
 
 
 @filters_bp.route("/filters")
@@ -236,7 +245,9 @@ def api_remove_filter(filter_type: str, value: str):
     if phy not in ("wifi", "btle", "bt"):
         return jsonify({"success": False, "error": "Invalid PHY type"}), 400
 
-    result = call_filter_script(f"--remove-{filter_type}", "--ssid", value, "--phy", phy)
+    result = call_filter_script(
+        f"--remove-{filter_type}", "--ssid", value, "--phy", phy
+    )
     return jsonify(result)
 
 
@@ -292,7 +303,10 @@ def api_processor_status():
             return jsonify({"running": True, "pid": pid})
         return jsonify({"running": False, "pid": None})
     except Exception as e:
-        return jsonify({"running": False, "pid": None, "error": str(e)})
+        logger.error("Error checking processor status: %s", e, exc_info=True)
+        return jsonify(
+            {"running": False, "pid": None, "error": "An internal error occurred"}
+        )
 
 
 @filters_bp.route("/scan-ssid")

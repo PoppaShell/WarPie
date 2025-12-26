@@ -1,10 +1,13 @@
 """WarPie Web Control Panel - Log Viewing Routes."""
 
+import logging
 import subprocess
 from datetime import date
 from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request
+
+logger = logging.getLogger(__name__)
 
 logs_bp = Blueprint("logs", __name__)
 
@@ -32,7 +35,11 @@ def _get_wigle_logs(lines: int) -> list[str]:
         if result.stdout.strip():
             # Strip each line and filter out empty lines
             output.extend(
-                [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+                [
+                    line.strip()
+                    for line in result.stdout.strip().split("\n")
+                    if line.strip()
+                ]
             )
         else:
             output.append("(empty)")
@@ -60,7 +67,9 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
     )
     if result.returncode == 0 and result.stdout.strip():
         # Strip each line and filter out empty lines
-        return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
+        return [
+            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+        ]
     return ["No log entries found"]
 
 
@@ -87,7 +96,8 @@ def get_logs(source: str = "wardrive", lines: int = 100) -> list[str]:
             return _get_journal_logs("warpie-network", lines)
         return ["Unknown log source"]
     except Exception as e:
-        return [f"Error: {e!s}"]
+        logger.error("Error retrieving logs from %s: %s", source, e, exc_info=True)
+        return ["An error occurred while retrieving logs"]
 
 
 @logs_bp.route("/logs")
