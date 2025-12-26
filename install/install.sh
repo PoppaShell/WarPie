@@ -2608,9 +2608,10 @@ uninstall() {
     echo "  - udev interface naming rules"
     echo "  - Kismet APT repository"
     echo ""
-    read -p "Are you sure? (yes/no): " confirm
+    read -p "Are you sure? (Y/n): " confirm
+    confirm=${confirm:-Y}  # Default to Y if empty
 
-    if [[ "$confirm" != "yes" ]]; then
+    if [[ ! "$confirm" =~ ^[Yy] ]]; then
         echo "Uninstall cancelled."
         exit 0
     fi
@@ -2721,8 +2722,9 @@ uninstall() {
     # Remove Kismet APT repository (optional)
     # -------------------------------------------------------------------------
     echo ""
-    read -p "Remove Kismet APT repository? (yes/no): " remove_repo
-    if [[ "$remove_repo" == "yes" ]]; then
+    read -p "Remove Kismet APT repository? (Y/n): " remove_repo
+    remove_repo=${remove_repo:-Y}  # Default to Y if empty
+    if [[ "$remove_repo" =~ ^[Yy] ]]; then
         log_info "Removing Kismet APT repository..."
         rm -f /etc/apt/sources.list.d/kismet.list
         apt-get update -qq 2>/dev/null || true
@@ -2732,15 +2734,17 @@ uninstall() {
     # Remove user data (optional)
     # -------------------------------------------------------------------------
     echo ""
-    read -p "Remove user data (config, BSSIDs, logs)? (yes/no): " remove_data
-    if [[ "$remove_data" == "yes" ]]; then
+    read -p "Remove user data (config, BSSIDs, logs)? (Y/n): " remove_data
+    remove_data=${remove_data:-Y}  # Default to Y if empty
+    if [[ "$remove_data" =~ ^[Yy] ]]; then
         log_info "Removing user data..."
         rm -rf /etc/warpie
         rm -rf /var/log/warpie
 
         # Optionally remove Kismet logs
-        read -p "Remove Kismet capture logs in /var/log/kismet/? (yes/no): " remove_kismet_logs
-        if [[ "$remove_kismet_logs" == "yes" ]]; then
+        read -p "Remove Kismet capture logs in /var/log/kismet/? (Y/n): " remove_kismet_logs
+        remove_kismet_logs=${remove_kismet_logs:-Y}  # Default to Y if empty
+        if [[ "$remove_kismet_logs" =~ ^[Yy] ]]; then
             rm -rf "/var/log/kismet"
             log_info "Kismet logs removed"
         fi
