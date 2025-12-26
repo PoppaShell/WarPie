@@ -1749,6 +1749,88 @@ SERVICE_EOF
     log_success "Control panel installed (Flask + HTMX)"
 }
 
+# =============================================================================
+# CONFIGURE FILTER MANAGER
+# =============================================================================
+configure_filter_manager() {
+    log_info "Installing network filter management scripts..."
+
+    local base_url="https://raw.githubusercontent.com/PoppaShell/WarPie/${WARPIE_BRANCH:-main}"
+
+    # 1. Install warpie-filter-manager.py (primary Python CLI)
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-filter-manager.py" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-filter-manager.py" /usr/local/bin/warpie-filter-manager.py
+    else
+        log_info "Downloading warpie-filter-manager.py..."
+        if ! curl -sSL "${base_url}/bin/warpie-filter-manager.py" -o /usr/local/bin/warpie-filter-manager.py; then
+            log_error "Failed to download warpie-filter-manager.py"
+            return 1
+        fi
+    fi
+    chmod +x /usr/local/bin/warpie-filter-manager.py
+
+    # 2. Install warpie-filter-manager.sh (legacy Bash version)
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-filter-manager.sh" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-filter-manager.sh" /usr/local/bin/warpie-filter-manager.sh
+    else
+        log_info "Downloading warpie-filter-manager.sh..."
+        if ! curl -sSL "${base_url}/bin/warpie-filter-manager.sh" -o /usr/local/bin/warpie-filter-manager.sh; then
+            log_warn "Failed to download warpie-filter-manager.sh (optional legacy script)"
+        fi
+    fi
+    [[ -f /usr/local/bin/warpie-filter-manager.sh ]] && chmod +x /usr/local/bin/warpie-filter-manager.sh
+
+    # 3. Install warpie-filter-processor.py (daemon for post-processing)
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-filter-processor.py" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-filter-processor.py" /usr/local/bin/warpie-filter-processor.py
+    else
+        log_info "Downloading warpie-filter-processor.py..."
+        if ! curl -sSL "${base_url}/bin/warpie-filter-processor.py" -o /usr/local/bin/warpie-filter-processor.py; then
+            log_error "Failed to download warpie-filter-processor.py"
+            return 1
+        fi
+    fi
+    chmod +x /usr/local/bin/warpie-filter-processor.py
+
+    # 4. Install warpie-exclude-ssid.sh (legacy SSID management)
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-exclude-ssid.sh" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-exclude-ssid.sh" /usr/local/bin/warpie-exclude-ssid.sh
+    else
+        log_info "Downloading warpie-exclude-ssid.sh..."
+        if ! curl -sSL "${base_url}/bin/warpie-exclude-ssid.sh" -o /usr/local/bin/warpie-exclude-ssid.sh; then
+            log_warn "Failed to download warpie-exclude-ssid.sh (optional legacy script)"
+        fi
+    fi
+    [[ -f /usr/local/bin/warpie-exclude-ssid.sh ]] && chmod +x /usr/local/bin/warpie-exclude-ssid.sh
+
+    # 5. Install validate-warpie.sh (post-installation validator)
+    if [[ -f "${SCRIPT_DIR}/../bin/validate-warpie.sh" ]]; then
+        cp "${SCRIPT_DIR}/../bin/validate-warpie.sh" /usr/local/bin/validate-warpie.sh
+    else
+        log_info "Downloading validate-warpie.sh..."
+        if ! curl -sSL "${base_url}/bin/validate-warpie.sh" -o /usr/local/bin/validate-warpie.sh; then
+            log_warn "Failed to download validate-warpie.sh (optional validation tool)"
+        fi
+    fi
+    [[ -f /usr/local/bin/validate-warpie.sh ]] && chmod +x /usr/local/bin/validate-warpie.sh
+
+    # 6. Install filter processor systemd service
+    if [[ -f "${SCRIPT_DIR}/../systemd/warpie-filter-processor.service" ]]; then
+        cp "${SCRIPT_DIR}/../systemd/warpie-filter-processor.service" /etc/systemd/system/
+    else
+        log_info "Downloading warpie-filter-processor.service..."
+        if ! curl -sSL "${base_url}/systemd/warpie-filter-processor.service" -o /etc/systemd/system/warpie-filter-processor.service; then
+            log_warn "Failed to download warpie-filter-processor.service (optional daemon service)"
+        fi
+    fi
+
+    # 7. Create filter configuration files if they don't exist
+    touch /etc/warpie/filter_rules.conf
+    touch /etc/warpie/target_lists.conf
+
+    log_success "Filter management scripts installed"
+}
+
 # Legacy embedded script removed - now uses Flask application in web/ directory
 _REMOVED_LEGACY_CONTROL_PANEL() {
     # This function documents that the old embedded control panel has been
@@ -2442,6 +2524,9 @@ run_tests() {
     test_check "wardrive.sh exists" "[[ -x /usr/local/bin/wardrive.sh ]]"
     test_check "warpie-control exists" "[[ -x /usr/local/bin/warpie-control ]]"
     test_check "web package exists" "[[ -d /usr/local/share/warpie/web ]]"
+    test_check "warpie-filter-manager.py exists" "[[ -x /usr/local/bin/warpie-filter-manager.py ]]"
+    test_check "warpie-filter-processor.py exists" "[[ -x /usr/local/bin/warpie-filter-processor.py ]]"
+    test_check "validate-warpie.sh exists" "[[ -x /usr/local/bin/validate-warpie.sh ]]"
     test_check "warpie-recovery.sh exists" "[[ -x /usr/local/bin/warpie-recovery.sh ]]"
     
     echo ""
@@ -2576,6 +2661,8 @@ uninstall() {
     rm -f /usr/local/bin/warpie-exclude-ssid.sh
     rm -f /usr/local/bin/validate-warpie.sh
     rm -f /usr/local/bin/warpie-filter-processor.py
+    rm -f /usr/local/bin/warpie-filter-manager.py
+    rm -f /usr/local/bin/warpie-filter-manager.sh
 
     # -------------------------------------------------------------------------
     # Remove Kismet configurations
@@ -2793,6 +2880,7 @@ main() {
             configure_wardrive_service
             configure_network_service
             configure_control_panel
+            configure_filter_manager
             configure_recovery
             enable_services
             start_services
