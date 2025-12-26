@@ -1066,22 +1066,23 @@ BSSID_HEADER
 # =============================================================================
 configure_kismet_exclusions() {
     local bssids=("$@")
-    
+
     log_info "Generating Kismet exclusion filters..."
-    
+
     # We'll append to kismet_site.conf after it's created
-    # Store exclusions for later
+    # Store exclusions for later (format: "SSID|filter_line")
     KISMET_EXCLUSIONS=()
-    
+
     for bssid in "${bssids[@]}"; do
         # Convert to uppercase and create mask that ignores first octet
         # This catches HOME and HOME-GUEST variants
         local upper_bssid=$(echo "$bssid" | tr '[:lower:]' '[:upper:]')
         # Replace first octet with 00 for the filter
         local masked_bssid="00${upper_bssid:2}"
-        KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
+        # Store with HOME_SSID context (format: "SSID|filter_line")
+        KISMET_EXCLUSIONS+=("${HOME_SSID}|kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
     done
-    
+
     log_success "Generated ${#KISMET_EXCLUSIONS[@]} exclusion filter(s)"
 }
 
@@ -1106,16 +1107,17 @@ configure_additional_exclusions() {
         if [[ "$input" =~ ^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$ ]]; then
             local upper_bssid=$(echo "$input" | tr '[:lower:]' '[:upper:]')
             local masked_bssid="00${upper_bssid:2}"
-            KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
+            # Store with "Manual BSSID" context since we don't have SSID
+            KISMET_EXCLUSIONS+=("Manual BSSID|kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
             log_success "Added exclusion for BSSID: $input"
         else
             # It's an SSID, scan for it
             log_info "Scanning for '$input'..."
-            
+
             local scan_bssids=()
             current_bssid=""
             current_ssid=""
-            
+
             while IFS= read -r line; do
                 if [[ "$line" =~ ^BSS[[:space:]]([0-9a-fA-F:]+) ]]; then
                     if [[ -n "$current_bssid" && "$current_ssid" == "$input" ]]; then
@@ -1127,11 +1129,11 @@ configure_additional_exclusions() {
                     current_ssid="${BASH_REMATCH[1]}"
                 fi
             done <<< "$(iw dev wlan0 scan 2>/dev/null)"
-            
+
             if [[ -n "$current_bssid" && "$current_ssid" == "$input" ]]; then
                 scan_bssids+=("$current_bssid")
             fi
-            
+
             if [[ ${#scan_bssids[@]} -eq 0 ]]; then
                 log_warn "No networks found matching '$input'"
             else
@@ -1139,7 +1141,8 @@ configure_additional_exclusions() {
                 for bssid in "${scan_bssids[@]}"; do
                     local upper_bssid=$(echo "$bssid" | tr '[:lower:]' '[:upper:]')
                     local masked_bssid="00${upper_bssid:2}"
-                    KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
+                    # Store with SSID context (format: "SSID|filter_line")
+                    KISMET_EXCLUSIONS+=("${input}|kis_log_device_filter=IEEE802.11,${masked_bssid}/00:FF:FF:FF:FF:FF,block")
                     echo "  Added: $bssid"
                 done
             fi
@@ -1411,8 +1414,8 @@ configure_kismet() {
         local WLAN0_MAC=$(cat /sys/class/net/wlan0/address | tr '[:lower:]' '[:upper:]')
         if [[ -n "$WLAN0_MAC" ]]; then
             log_info "Auto-excluding WarPie AP (wlan0 MAC: ${WLAN0_MAC})"
-            # Add exact MAC match for the WarPie AP
-            KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${WLAN0_MAC}/FF:FF:FF:FF:FF:FF,block")
+            # Add exact MAC match for the WarPie AP with context
+            KISMET_EXCLUSIONS+=("WarPie AP|kis_log_device_filter=IEEE802.11,${WLAN0_MAC}/FF:FF:FF:FF:FF:FF,block")
         fi
     fi
     
@@ -1438,7 +1441,12 @@ KISMET_SITE_EOF
         echo "" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         echo "# Excluded networks (auto-generated)" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         for exclusion in "${KISMET_EXCLUSIONS[@]}"; do
-            echo "$exclusion" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+            # Split on pipe: "SSID|filter_line"
+            local ssid_context="${exclusion%%|*}"
+            local filter_line="${exclusion#*|}"
+            # Write context comment then filter
+            echo "# WARPIE_FILTER: ${ssid_context}" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+            echo "$filter_line" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         done
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Kismet site config"
     fi
@@ -1487,7 +1495,12 @@ WARDRIVE_EOF
     if [[ ${#KISMET_EXCLUSIONS[@]} -gt 0 ]]; then
         echo "# Excluded networks (auto-generated)" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
         for exclusion in "${KISMET_EXCLUSIONS[@]}"; do
-            echo "$exclusion" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
+            # Split on pipe: "SSID|filter_line"
+            local ssid_context="${exclusion%%|*}"
+            local filter_line="${exclusion#*|}"
+            # Write context comment then filter
+            echo "# WARPIE_FILTER: ${ssid_context}" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
+            echo "$filter_line" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
         done
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Wardrive config"
     fi
@@ -2790,7 +2803,7 @@ run_configure() {
         local AP_MAC_UPPER
         AP_MAC_UPPER=$(echo "${WIFI_AP_MAC}" | tr '[:lower:]' '[:upper:]')
         log_info "Auto-excluding WarPie AP (MAC: ${AP_MAC_UPPER})"
-        KISMET_EXCLUSIONS+=("kis_log_device_filter=IEEE802.11,${AP_MAC_UPPER}/FF:FF:FF:FF:FF:FF,block")
+        KISMET_EXCLUSIONS+=("WarPie AP|kis_log_device_filter=IEEE802.11,${AP_MAC_UPPER}/FF:FF:FF:FF:FF:FF,block")
     fi
 
     configure_wifi_interactive
@@ -2808,23 +2821,33 @@ run_configure() {
         echo "" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         echo "# Excluded networks (auto-generated)" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         for exclusion in "${KISMET_EXCLUSIONS[@]}"; do
-            echo "$exclusion" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+            # Split on pipe: "SSID|filter_line"
+            local ssid_context="${exclusion%%|*}"
+            local filter_line="${exclusion#*|}"
+            # Write context comment then filter
+            echo "# WARPIE_FILTER: ${ssid_context}" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+            echo "$filter_line" >> "${KISMET_CONF_DIR}/kismet_site.conf"
         done
-        
+
         log_success "Site config updated with ${#KISMET_EXCLUSIONS[@]} exclusion(s)"
-        
+
         # Update wardrive config too
         if [[ -f "${KISMET_CONF_DIR}/kismet_wardrive.conf" ]]; then
             sed -i '/# Excluded networks (auto-generated)/,$d' "${KISMET_CONF_DIR}/kismet_wardrive.conf"
             sed -i '/# HOME NETWORK EXCLUSIONS/,$d' "${KISMET_CONF_DIR}/kismet_wardrive.conf"
-            
+
             echo "" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
             echo "# HOME NETWORK EXCLUSIONS" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
             echo "# Excluded networks (auto-generated)" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
             for exclusion in "${KISMET_EXCLUSIONS[@]}"; do
-                echo "$exclusion" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
+                # Split on pipe: "SSID|filter_line"
+                local ssid_context="${exclusion%%|*}"
+                local filter_line="${exclusion#*|}"
+                # Write context comment then filter
+                echo "# WARPIE_FILTER: ${ssid_context}" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
+                echo "$filter_line" >> "${KISMET_CONF_DIR}/kismet_wardrive.conf"
             done
-            
+
             log_success "Wardrive config updated with ${#KISMET_EXCLUSIONS[@]} exclusion(s)"
         fi
     fi

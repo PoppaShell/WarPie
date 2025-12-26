@@ -623,10 +623,13 @@ document.addEventListener('touchstart', function(evt) {
 // === HTMX Event Handlers ===
 
 document.body.addEventListener('htmx:afterSwap', function(evt) {
-    // Handle successful mode switch
+    // Handle successful mode switch - only show toast for main swap, not OOB swap
     if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/api/mode') {
-        showToast('Mode switched');
-        hideTargetPicker();
+        // Only show toast if this is the main swap (status-panel), not OOB swap (mode-buttons)
+        if (evt.detail.target && evt.detail.target.id === 'status-panel') {
+            showToast('Mode switched');
+            hideTargetPicker();
+        }
     }
 });
 
