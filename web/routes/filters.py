@@ -34,9 +34,7 @@ def call_filter_script(*args) -> dict:
         return {"success": False, "error": "No filter manager script found"}
 
     try:
-        result = subprocess.run(
-            cmd, check=False, capture_output=True, text=True, timeout=30
-        )
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=30)
         if result.stdout.strip():
             return json.loads(result.stdout)
         # Check stderr for error messages
@@ -66,9 +64,7 @@ def call_processor_script(*args) -> dict:
 
     try:
         cmd = ["python3", FILTER_PROCESSOR_SCRIPT, "--json", *args]
-        result = subprocess.run(
-            cmd, check=False, capture_output=True, text=True, timeout=60
-        )
+        result = subprocess.run(cmd, check=False, capture_output=True, text=True, timeout=60)
         if result.stdout.strip():
             return json.loads(result.stdout)
         return {"success": False, "error": "No output from processor"}
@@ -245,9 +241,7 @@ def api_remove_filter(filter_type: str, value: str):
     if phy not in ("wifi", "btle", "bt"):
         return jsonify({"success": False, "error": "Invalid PHY type"}), 400
 
-    result = call_filter_script(
-        f"--remove-{filter_type}", "--ssid", value, "--phy", phy
-    )
+    result = call_filter_script(f"--remove-{filter_type}", "--ssid", value, "--phy", phy)
     return jsonify(result)
 
 
@@ -304,9 +298,7 @@ def api_processor_status():
         return jsonify({"running": False, "pid": None})
     except Exception as e:
         logger.error("Error checking processor status: %s", e, exc_info=True)
-        return jsonify(
-            {"running": False, "pid": None, "error": "An internal error occurred"}
-        )
+        return jsonify({"running": False, "pid": None, "error": "An internal error occurred"})
 
 
 @filters_bp.route("/scan-ssid")

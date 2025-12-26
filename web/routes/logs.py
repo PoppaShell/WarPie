@@ -35,11 +35,7 @@ def _get_wigle_logs(lines: int) -> list[str]:
         if result.stdout.strip():
             # Strip each line and filter out empty lines
             output.extend(
-                [
-                    line.strip()
-                    for line in result.stdout.strip().split("\n")
-                    if line.strip()
-                ]
+                [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
             )
         else:
             output.append("(empty)")
@@ -67,9 +63,7 @@ def _get_journal_logs(unit: str, lines: int, output_format: str = "short") -> li
     )
     if result.returncode == 0 and result.stdout.strip():
         # Strip each line and filter out empty lines
-        return [
-            line.strip() for line in result.stdout.strip().split("\n") if line.strip()
-        ]
+        return [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
     return ["No log entries found"]
 
 
