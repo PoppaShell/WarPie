@@ -6,7 +6,7 @@ System design and component interaction for the WarPie platform.
 
 WarPie is a wardriving platform that manages:
 
-- Dual-band WiFi capture with Kismet
+- Multi-adapter WiFi capture with Kismet
 - Optional BTLE scanning
 - Intelligent network switching (home vs mobile AP)
 - GPS location tracking
@@ -14,15 +14,18 @@ WarPie is a wardriving platform that manages:
 
 ## Hardware Layout
 
+The diagram below shows a typical configuration. Interface names and specific
+adapters vary based on your hardware - the installer auto-detects and assigns roles.
+
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     Raspberry Pi 4B                         │
+│                     Raspberry Pi 4B+                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
 │  │   wlan0      │  │   wlan1      │  │   wlan2      │      │
-│  │  (onboard)   │  │  (AWUS036)   │  │  (RT3070)    │      │
-│  │   2.4/5GHz   │  │   5/6GHz     │  │   2.4GHz     │      │
+│  │  (onboard)   │  │  (USB WiFi)  │  │  (USB WiFi)  │      │
+│  │   2.4/5GHz   │  │   Band A     │  │   Band B     │      │
 │  │              │  │              │  │              │      │
 │  │  Network     │  │  Kismet      │  │  Kismet      │      │
 │  │  Connection  │  │  Monitor     │  │  Monitor     │      │
@@ -30,13 +33,13 @@ WarPie is a wardriving platform that manages:
 │                                                             │
 │  ┌──────────────────────────────────────────────────┐      │
 │  │                    GPS                            │      │
-│  │              GlobalSat BU-353S4                   │      │
+│  │              gpsd-compatible USB                  │      │
 │  │                 /dev/gps0                         │      │
 │  └──────────────────────────────────────────────────┘      │
 │                                                             │
 │  ┌──────────────────────────────────────────────────┐      │
 │  │              BTLE (Optional)                      │      │
-│  │              TI CC2540 Adapter                    │      │
+│  │              TI CC2540 or similar                 │      │
 │  └──────────────────────────────────────────────────┘      │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘

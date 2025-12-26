@@ -255,7 +255,7 @@ curl -s http://localhost:2501/system/status.json
 
 #### 2. Check Config Files
 ```bash
-ls -la /usr/local/etc/kismet*.conf
+ls -la /etc/kismet/kismet*.conf
 ```
 
 ## Service Recovery

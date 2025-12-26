@@ -136,19 +136,24 @@ tail -f /var/log/warpie/network-manager.log
 
 ## Interface Assignments
 
-| Interface | Device | MAC | Role |
-|-----------|--------|-----|------|
-| wlan0 | Onboard | d8:3a:dd:6c:0e:c1 | Home/AP |
-| wlan1 | AWUS036AXML | 00:c0:ca:b8:ff:ac | Kismet 5/6GHz |
-| wlan2 | RT3070 | 00:c0:ca:89:21:7e | Kismet 2.4GHz |
-| /dev/ttyUSB0 | BU-353-S4 | - | GPS |
+Interface names are pinned to MAC addresses via udev rules during installation.
+Run `iw dev` to see your current assignments.
 
-## HOME Network BSSIDs
+| Interface | Role | Notes |
+|-----------|------|-------|
+| wlan0 | Home/AP | Typically onboard WiFi |
+| wlan1+ | Kismet Capture | USB adapters in monitor mode |
+| /dev/ttyUSB0 | GPS | Or /dev/gps0 via symlink |
 
-| BSSID | Description |
-|-------|-------------|
-| 94:2a:6f:0c:ed:85 | HOME AP 1 |
-| 74:83:c2:8a:23:4c | HOME AP 2 |
+## Finding Your BSSIDs
+
+```bash
+# View configured home networks
+cat /etc/warpie/known_bssids.conf
+
+# Get current connection BSSID
+iw dev wlan0 link | grep -i bssid
+```
 
 ---
 
