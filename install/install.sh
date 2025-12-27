@@ -1837,8 +1837,42 @@ configure_filter_manager() {
         fi
     fi
 
-    # 7. Create filter configuration files if they don't exist
-    touch /etc/warpie/filter_rules.conf
+    # 7. Create filter configuration files with proper section headers
+    if [[ ! -s /etc/warpie/filter_rules.conf ]]; then
+        cat > /etc/warpie/filter_rules.conf << 'FILTER_RULES_EOF'
+# WarPie Network Filter Configuration
+# Version: 2.4.1
+#
+# Three filtering paradigms:
+# 1. STATIC EXCLUSIONS: Stable-MAC networks blocked at capture time
+# 2. DYNAMIC EXCLUSIONS: Rotating-MAC networks removed via post-processing
+# 3. TARGETING INCLUSIONS: OUI prefixes added to targeting modes
+#
+# FORMAT: value|type|description
+# TYPES: exact, pattern, bssid, oui
+
+[static_exclusions]
+# WiFi networks with stable MACs - BSSIDs discovered and blocked at capture time
+
+[dynamic_exclusions]
+# WiFi networks with rotating MACs - only SSID stored, post-process removal
+
+[btle_static_exclusions]
+# BTLE devices with stable MACs - blocked at capture time
+
+[btle_dynamic_exclusions]
+# BTLE devices with rotating MACs - removed by device name post-processing
+
+[bt_static_exclusions]
+# Classic Bluetooth devices with stable MACs
+
+[bt_dynamic_exclusions]
+# Classic Bluetooth devices removed by name
+
+[targeting_inclusions]
+# OUI prefixes for targeting modes
+FILTER_RULES_EOF
+    fi
     touch /etc/warpie/target_lists.conf
 
     log_success "Filter management scripts installed"

@@ -146,11 +146,17 @@ class FilterManager:
             self.log_success(msg)
 
     def ensure_config_dir(self) -> None:
-        """Ensure config directory and files exist."""
+        """Ensure config directory and files exist with proper section headers."""
         if not WARPIE_DIR.exists():
             subprocess.run(["sudo", "mkdir", "-p", str(WARPIE_DIR)], check=True)
 
-        if not FILTER_RULES_FILE.exists():
+        # Check if file doesn't exist OR is empty (size 0)
+        file_missing_or_empty = (
+            not FILTER_RULES_FILE.exists()
+            or FILTER_RULES_FILE.stat().st_size == 0
+        )
+
+        if file_missing_or_empty:
             config_content = """# WarPie Network Filter Configuration
 # Version: 2.4.1
 #
