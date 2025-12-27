@@ -131,7 +131,7 @@ markers = [
 # Coverage Configuration
 # =============================================================================
 [tool.coverage.run]
-source = ["bin"]
+source = ["bin", "web"]
 branch = true
 omit = [
     "tests/*",
