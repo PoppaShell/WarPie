@@ -311,11 +311,10 @@ class FilterManager:
                         #   Old: # WARPIE_FILTER: SSID
                         #   New: # WARPIE_FILTER (PHY): SSID
                         if line.startswith("# WARPIE_FILTER"):
-                            if ": " in line:
-                                # Extract context after the colon
-                                filter_context = line.split(": ", 1)[1].strip()
-                            else:
-                                filter_context = ""
+                            # Extract context after colon, or empty string if no colon
+                            filter_context = (
+                                line.split(": ", 1)[1].strip() if ": " in line else ""
+                            )
                             continue
 
                         # Check for home network exclusions comment
