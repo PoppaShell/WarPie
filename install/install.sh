@@ -2677,6 +2677,18 @@ uninstall() {
     pkill -f "dnsmasq.*warpie" 2>/dev/null || true
 
     # -------------------------------------------------------------------------
+    # Remove monitor mode interfaces created by Kismet
+    # -------------------------------------------------------------------------
+    log_info "Removing monitor mode interfaces..."
+    for iface in /sys/class/net/*mon; do
+        if [[ -e "$iface" ]]; then
+            iface_name=$(basename "$iface")
+            iw dev "$iface_name" del 2>/dev/null && \
+                log_success "Removed monitor interface: $iface_name" || true
+        fi
+    done
+
+    # -------------------------------------------------------------------------
     # Disable all WarPie services
     # -------------------------------------------------------------------------
     log_info "Disabling services..."
