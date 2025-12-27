@@ -78,7 +78,8 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"tests/*" = ["S101", "ARG", "PLR2004"]
+# Tests: Allow assert, unused args, magic values, and deferred imports for test isolation
+"tests/*" = ["S101", "ARG", "PLR2004", "PLC0415"]
 "bin/*" = ["S603", "S607"]
 # bin/warpie-control - entry point with deferred imports and all-interface binding
 "bin/warpie-control" = ["S104", "PLC0415"]
@@ -146,5 +147,5 @@ exclude_lines = [
     "if __name__ == .__main__.:",
     "if TYPE_CHECKING:",
 ]
-fail_under = 50
+fail_under = 80
 show_missing = true
