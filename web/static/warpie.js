@@ -622,11 +622,21 @@ document.addEventListener('touchstart', function(evt) {
 
 // === HTMX Event Handlers ===
 
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-    // Handle successful mode switch - only show toast for main swap, not OOB swap
+// Track if we've already shown the mode switch toast for this request
+let modeToastShown = false;
+
+document.body.addEventListener('htmx:beforeRequest', function(evt) {
+    // Reset toast flag before each mode switch request
     if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/api/mode') {
-        // Only show toast if this is the main swap (status-panel), not OOB swap (mode-buttons)
-        if (evt.detail.target && evt.detail.target.id === 'status-panel') {
+        modeToastShown = false;
+    }
+});
+
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    // Handle successful mode switch - only show toast once per request
+    if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath === '/api/mode') {
+        if (!modeToastShown) {
+            modeToastShown = true;
             showToast('Mode switched');
             hideTargetPicker();
         }
