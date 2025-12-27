@@ -290,9 +290,7 @@ class TestGetWigleLogs:
         mock_path.stat.return_value = MagicMock(st_mtime=12345)
         mock_glob.return_value = [mock_path]
 
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="WiGLE,Header\ndata,line"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="WiGLE,Header\ndata,line")
 
         result = _get_wigle_logs(100)
         assert "=== test.wiglecsv ===" in result[0]
@@ -337,9 +335,7 @@ class TestGetJournalLogs:
         """Returns parsed journal lines on success."""
         from web.routes.logs import _get_journal_logs
 
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout="Line 1\nLine 2\nLine 3\n"
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="Line 1\nLine 2\nLine 3\n")
 
         result = _get_journal_logs("wardrive", 100)
         assert len(result) == 3
@@ -462,9 +458,7 @@ class TestTargetListIO:
         from web.routes.targets import get_hidden_lists
 
         mock_exists.return_value = True
-        mock_read.return_value = json.dumps(
-            {"hidden_lists": ["list1", "list2"], "lists": {}}
-        )
+        mock_read.return_value = json.dumps({"hidden_lists": ["list1", "list2"], "lists": {}})
 
         result = get_hidden_lists()
         assert result == ["list1", "list2"]
@@ -495,9 +489,7 @@ class TestCallFilterScript:
         from web.routes.filters import call_filter_script
 
         mock_exists.return_value = True
-        mock_run.return_value = MagicMock(
-            stdout='{"success": true}', stderr="", returncode=0
-        )
+        mock_run.return_value = MagicMock(stdout='{"success": true}', stderr="", returncode=0)
 
         result = call_filter_script("--list")
         assert result["success"] is True
@@ -546,9 +538,7 @@ class TestCallFilterScript:
         from web.routes.filters import call_filter_script
 
         mock_exists.return_value = True
-        mock_run.return_value = MagicMock(
-            stdout="", stderr="Error message", returncode=1
-        )
+        mock_run.return_value = MagicMock(stdout="", stderr="Error message", returncode=1)
 
         result = call_filter_script("--list")
         assert result["success"] is False
@@ -578,9 +568,7 @@ class TestCallProcessorScript:
         from web.routes.filters import call_processor_script
 
         mock_exists.return_value = True
-        mock_run.return_value = MagicMock(
-            stdout='{"success": true}', stderr="", returncode=0
-        )
+        mock_run.return_value = MagicMock(stdout='{"success": true}', stderr="", returncode=0)
 
         result = call_processor_script("--preview", "/path")
         assert result["success"] is True

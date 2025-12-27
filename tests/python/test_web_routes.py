@@ -91,9 +91,7 @@ class TestMainRoutes:
     @patch("web.routes.main.switch_mode")
     @patch("web.routes.main.get_kismet_status")
     @patch("web.routes.main.get_uptime")
-    def test_api_mode_switch_success(
-        self, mock_uptime, mock_status, mock_switch, client
-    ):
+    def test_api_mode_switch_success(self, mock_uptime, mock_status, mock_switch, client):
         """Successful mode switch should return updated status HTML."""
         mock_switch.return_value = True
         mock_status.return_value = (True, "Wardrive")
@@ -184,9 +182,7 @@ class TestFilterRoutes:
     def test_api_list_static_filters(self, mock_script, client):
         """List static filters should return WiFi static exclusions."""
         mock_script.return_value = {
-            "static_exclusions": [
-                {"ssid": "MyNetwork", "bssids": ["AA:BB:CC:DD:EE:FF"]}
-            ],
+            "static_exclusions": [{"ssid": "MyNetwork", "bssids": ["AA:BB:CC:DD:EE:FF"]}],
         }
 
         response = client.get("/api/filters/static")
@@ -415,9 +411,7 @@ class TestTargetRoutes:
     @patch("web.routes.targets.load_target_lists")
     def test_api_create_target_list_duplicate_name(self, mock_load, client):
         """Creating a list with duplicate name should fail."""
-        mock_load.return_value = {
-            "existing": {"id": "existing", "name": "Existing"}
-        }
+        mock_load.return_value = {"existing": {"id": "existing", "name": "Existing"}}
 
         response = client.post("/api/targets/lists", json={"name": "existing"})
         assert response.status_code == 400
@@ -732,9 +726,7 @@ class TestHTMXRequests:
     @patch("web.routes.targets.load_target_lists")
     def test_target_list_htmx_returns_html(self, mock_load, client):
         """Single target list with HX-Request should return HTML partial."""
-        mock_load.return_value = {
-            "test": {"ouis": []}
-        }
+        mock_load.return_value = {"test": {"ouis": []}}
 
         response = client.get(
             "/api/targets/lists/test",

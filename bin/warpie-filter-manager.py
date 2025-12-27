@@ -152,8 +152,7 @@ class FilterManager:
 
         # Check if file doesn't exist OR is empty (size 0)
         file_missing_or_empty = (
-            not FILTER_RULES_FILE.exists()
-            or FILTER_RULES_FILE.stat().st_size == 0
+            not FILTER_RULES_FILE.exists() or FILTER_RULES_FILE.stat().st_size == 0
         )
 
         if file_missing_or_empty:
@@ -312,9 +311,7 @@ class FilterManager:
                         #   New: # WARPIE_FILTER (PHY): SSID
                         if line.startswith("# WARPIE_FILTER"):
                             # Extract context after colon, or empty string if no colon
-                            filter_context = (
-                                line.split(": ", 1)[1].strip() if ": " in line else ""
-                            )
+                            filter_context = line.split(": ", 1)[1].strip() if ": " in line else ""
                             continue
 
                         # Check for home network exclusions comment
