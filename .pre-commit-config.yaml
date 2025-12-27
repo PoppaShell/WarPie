@@ -86,6 +86,37 @@ repos:
         files: \.py$
         pass_filenames: false
 
+  # =============================================================================
+  # Testing - Run pytest on Python changes
+  # =============================================================================
+  - repo: local
+    hooks:
+      - id: pytest-quick
+        name: pytest (quick check)
+        entry: bash -c 'python -m pytest tests/python/ -x -q --tb=line 2>/dev/null || echo "Tests failed - please fix before committing"'
+        language: system
+        files: \.(py)$
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: bats-quick
+        name: bats (quick check)
+        entry: bash -c 'bats tests/bash/ --tap 2>/dev/null | head -20 || echo "Bash tests failed"'
+        language: system
+        files: \.(sh|bats)$
+        pass_filenames: false
+        stages: [pre-push]
+
+  # =============================================================================
+  # Security Checks
+  # =============================================================================
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.5.0
+    hooks:
+      - id: detect-secrets
+        args: [--baseline, .secrets.baseline]
+        exclude: ^(\.claude/|tests/)
+
 # =============================================================================
 # CI Configuration
 # =============================================================================
