@@ -510,21 +510,32 @@ class TestArgumentParser:
     def test_exclusion_zones(self):
         """Test exclusion zone argument parsing."""
         parser = wigle_exporter.create_argument_parser()
-        args = parser.parse_args([
-            "--in", "test.kismet",
-            "--exclude-zone", "47.0,-122.5,47.1,-122.4",
-            "--exclude-zone", "48.0,-123.5,48.1,-123.4",
-            "--stats",
-        ])
+        args = parser.parse_args(
+            [
+                "--in",
+                "test.kismet",
+                "--exclude-zone",
+                "47.0,-122.5,47.1,-122.4",
+                "--exclude-zone",
+                "48.0,-123.5,48.1,-123.4",
+                "--stats",
+            ]
+        )
         assert len(args.exclude_zone) == 2
 
     def test_multiple_input_files(self):
         """Test multiple input files."""
         parser = wigle_exporter.create_argument_parser()
-        args = parser.parse_args([
-            "--in", "file1.kismet", "file2.kismet", "file3.kismet",
-            "--out", "out.csv",
-        ])
+        args = parser.parse_args(
+            [
+                "--in",
+                "file1.kismet",
+                "file2.kismet",
+                "file3.kismet",
+                "--out",
+                "out.csv",
+            ]
+        )
         assert len(args.input) == 3
 
 
@@ -569,11 +580,15 @@ class TestBuildConfigFromArgs:
     def test_exclusion_zones_in_config(self):
         """Test exclusion zones are added to config."""
         parser = wigle_exporter.create_argument_parser()
-        args = parser.parse_args([
-            "--in", "test.kismet",
-            "--exclude-zone", "47.0,-122.5,47.1,-122.4",
-            "--stats",
-        ])
+        args = parser.parse_args(
+            [
+                "--in",
+                "test.kismet",
+                "--exclude-zone",
+                "47.0,-122.5,47.1,-122.4",
+                "--stats",
+            ]
+        )
         config = wigle_exporter.build_config_from_args(args)
         assert len(config.exclusion_zones) == 1
         assert config.exclusion_zones[0] == (47.0, -122.5, 47.1, -122.4)
@@ -641,21 +656,26 @@ class TestDatabaseExtraction:
         cursor = conn.cursor()
 
         # Insert a test device
-        device_json = json.dumps({
-            "kismet.device.base.macaddr": "AA:BB:CC:DD:EE:FF",
-            "dot11.device": {
-                "dot11.device.last_beaconed_ssid_record": {
-                    "dot11.advertisedssid.ssid": "TestNetwork"
-                }
-            },
-            "kismet.device.base.channel": "6",
-            "kismet.device.base.signal": {"kismet.common.signal.last_signal": -65},
-            "kismet.device.base.crypt": 2,
-        })
-        cursor.execute("""
+        device_json = json.dumps(
+            {
+                "kismet.device.base.macaddr": "AA:BB:CC:DD:EE:FF",
+                "dot11.device": {
+                    "dot11.device.last_beaconed_ssid_record": {
+                        "dot11.advertisedssid.ssid": "TestNetwork"
+                    }
+                },
+                "kismet.device.base.channel": "6",
+                "kismet.device.base.signal": {"kismet.common.signal.last_signal": -65},
+                "kismet.device.base.crypt": 2,
+            }
+        )
+        cursor.execute(
+            """
             INSERT INTO devices (devmac, phyname, type, device, first_time, avg_lat, avg_lon)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, ("AA:BB:CC:DD:EE:FF", "IEEE802.11", "Wi-Fi AP", device_json, 1704067200, 47.6, -122.3))
+        """,
+            ("AA:BB:CC:DD:EE:FF", "IEEE802.11", "Wi-Fi AP", device_json, 1704067200, 47.6, -122.3),
+        )
         conn.commit()
         conn.close()
 
@@ -671,15 +691,20 @@ class TestDatabaseExtraction:
         cursor = conn.cursor()
 
         # Insert a BTLE device
-        device_json = json.dumps({
-            "kismet.device.base.macaddr": "11:22:33:44:55:66",
-            "kismet.device.base.commonname": "Fitness Band",
-            "kismet.device.base.signal": {"kismet.common.signal.last_signal": -80},
-        })
-        cursor.execute("""
+        device_json = json.dumps(
+            {
+                "kismet.device.base.macaddr": "11:22:33:44:55:66",
+                "kismet.device.base.commonname": "Fitness Band",
+                "kismet.device.base.signal": {"kismet.common.signal.last_signal": -80},
+            }
+        )
+        cursor.execute(
+            """
             INSERT INTO devices (devmac, phyname, type, device, first_time, avg_lat, avg_lon)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        """, ("11:22:33:44:55:66", "BTLE", "BR/EDR", device_json, 1704067200, 47.5, -122.4))
+        """,
+            ("11:22:33:44:55:66", "BTLE", "BR/EDR", device_json, 1704067200, 47.5, -122.4),
+        )
         conn.commit()
         conn.close()
 
@@ -700,9 +725,7 @@ class TestExportToWigle:
 
     def test_export_nonexistent_file(self):
         """Test exporting from non-existent file."""
-        config = wigle_exporter.ExportConfig(
-            input_files=["/nonexistent/file.kismet"]
-        )
+        config = wigle_exporter.ExportConfig(input_files=["/nonexistent/file.kismet"])
         result = wigle_exporter.export_to_wigle(config)
         # Should succeed but with no files processed
         assert result.stats.files_processed == 0
@@ -847,17 +870,19 @@ class TestIntegration:
         """)
 
         # Insert test devices
-        wifi_device = json.dumps({
-            "kismet.device.base.macaddr": "AA:BB:CC:DD:EE:FF",
-            "dot11.device": {
-                "dot11.device.last_beaconed_ssid_record": {
-                    "dot11.advertisedssid.ssid": "TestAP"
-                }
-            },
-            "kismet.device.base.channel": "11",
-            "kismet.device.base.signal": {"kismet.common.signal.last_signal": -50},
-            "kismet.device.base.crypt": 2,
-        })
+        wifi_device = json.dumps(
+            {
+                "kismet.device.base.macaddr": "AA:BB:CC:DD:EE:FF",
+                "dot11.device": {
+                    "dot11.device.last_beaconed_ssid_record": {
+                        "dot11.advertisedssid.ssid": "TestAP"
+                    }
+                },
+                "kismet.device.base.channel": "11",
+                "kismet.device.base.signal": {"kismet.common.signal.last_signal": -50},
+                "kismet.device.base.crypt": 2,
+            }
+        )
         cursor.execute(
             "INSERT INTO devices VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
             (
