@@ -18,7 +18,6 @@ import sqlite3
 import sys
 from datetime import datetime
 from pathlib import Path
-from unittest import mock
 
 import pytest
 
@@ -133,11 +132,11 @@ class TestExportConfigDataclass:
         assert config.apply_ssid_exclusions is False
         assert config.exclusion_zones == []
 
-    def test_export_config_custom_values(self):
+    def test_export_config_custom_values(self, tmp_path):
         """Test ExportConfig with custom values."""
         config = wigle_exporter.ExportConfig(
             input_files=["a.kismet", "b.kismet"],
-            output_file=Path("/tmp/out.csv"),
+            output_file=tmp_path / "out.csv",
             include_wifi=False,
             include_btle=True,
             include_bt=False,
@@ -859,9 +858,19 @@ class TestIntegration:
             "kismet.device.base.signal": {"kismet.common.signal.last_signal": -50},
             "kismet.device.base.crypt": 2,
         })
-        cursor.execute("""
-            INSERT INTO devices VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, ("AA:BB:CC:DD:EE:FF", "IEEE802.11", "Wi-Fi AP", wifi_device, 1704067200, 47.6, -122.3, 10.0))
+        cursor.execute(
+            "INSERT INTO devices VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                "AA:BB:CC:DD:EE:FF",
+                "IEEE802.11",
+                "Wi-Fi AP",
+                wifi_device,
+                1704067200,
+                47.6,
+                -122.3,
+                10.0,
+            ),
+        )
 
         conn.commit()
         conn.close()

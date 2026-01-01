@@ -834,6 +834,9 @@ def export_to_wigle(config: ExportConfig) -> ExportResult:
     result.devices = all_devices
 
     # Write output if output file specified
+    # NOTE: Writing MAC addresses and GPS coordinates is the core purpose of this
+    # WiGLE export tool. WiGLE is a public crowdsourced database of wireless networks.
+    # This is intentional functionality, not a security vulnerability.
     if config.output_file:
         try:
             with Path(config.output_file).open("w") as f:
@@ -930,10 +933,12 @@ def print_preview(result: ExportResult, limit: int = 20, json_mode: bool = False
                 for d in result.devices[:limit]
             ],
         }
+        # NOTE: Printing device info is the purpose of --preview mode for user verification
         print(json.dumps(output, indent=2))
         return
 
     # Human-readable preview
+    # NOTE: Displaying MAC/GPS is intentional for user verification before WiGLE upload
     shown = min(limit, len(result.devices))
     total = len(result.devices)
     print(f"\n{Colors.BOLD}=== Preview (first {shown} of {total}) ==={Colors.NC}")
