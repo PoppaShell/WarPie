@@ -45,6 +45,11 @@ INSTALL_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/install"
     [ -x "$INSTALL_DIR/install.sh" ]
 }
 
+@test "warpie-kismet-to-wigle.py exists and is executable" {
+    [ -f "$SCRIPT_DIR/warpie-kismet-to-wigle.py" ]
+    [ -x "$SCRIPT_DIR/warpie-kismet-to-wigle.py" ]
+}
+
 # =============================================================================
 # Help/Usage Tests
 # =============================================================================
@@ -65,6 +70,12 @@ INSTALL_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/install"
     run "$INSTALL_DIR/install.sh" --help
     [ "$status" -eq 0 ]
     [[ "$output" == *"Usage"* ]] || [[ "$output" == *"usage"* ]] || [[ "$output" == *"install"* ]]
+}
+
+@test "warpie-kismet-to-wigle.py shows help with --help" {
+    run python3 "$SCRIPT_DIR/warpie-kismet-to-wigle.py" --help
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"Export Kismet"* ]] || [[ "$output" == *"WiGLE"* ]] || [[ "$output" == *"wigle"* ]]
 }
 
 # =============================================================================
@@ -103,6 +114,11 @@ INSTALL_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../.." && pwd)/install"
 
 @test "install.sh has valid bash syntax" {
     run bash -n "$INSTALL_DIR/install.sh"
+    [ "$status" -eq 0 ]
+}
+
+@test "warpie-kismet-to-wigle.py has valid Python syntax" {
+    run python3 -m py_compile "$SCRIPT_DIR/warpie-kismet-to-wigle.py"
     [ "$status" -eq 0 ]
 }
 
