@@ -2698,6 +2698,10 @@ uninstall() {
 
     echo -e "${YELLOW}This will remove all WarPie components and revert system changes.${NC}"
     echo ""
+    echo -e "${RED}WARNING: If you are connected via WiFi (WarPie AP or managed by warpie-network),${NC}"
+    echo -e "${RED}         you will be DISCONNECTED when network services are stopped.${NC}"
+    echo -e "${RED}         Use a wired connection or local console for uninstall.${NC}"
+    echo ""
     echo "The following will be removed:"
     echo "  - All WarPie systemd services"
     echo "  - All WarPie scripts from /usr/local/bin/"
