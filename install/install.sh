@@ -1505,6 +1505,42 @@ WARDRIVE_EOF
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Wardrive config"
     fi
 
+    # WiGLE export overlay - optimized for BTLE export with our Python tool
+    cat > "${KISMET_CONF_DIR}/kismet_wigle.conf" << 'WIGLE_EOF'
+# WiGLE Export Mode - Optimized for BTLE/Bluetooth Export
+# Use with: kismet --override wigle
+# Or combine: kismet --override wardrive --override wigle
+#
+# This overlay configures Kismet to capture all device types including BTLE
+# with full database logging for our warpie-kismet-to-wigle.py post-processor.
+#
+# Unlike native wiglecsv log, this approach:
+# - Includes BTLE devices (native wiglecsv only exports WiFi)
+# - Correlates GPS from packets table for devices without direct GPS
+# - Supports rate limiting and privacy filtering at export time
+
+# Enable kismetdb logging (required for our exporter)
+log_types+=kismetdb
+
+# Disable native wiglecsv (we use our own post-processor)
+log_types-=wiglecsv
+
+# Log all packets for GPS correlation
+kis_log_packets=true
+
+# Don't ignore BTLE devices with random MACs
+# (Our exporter handles deduplication via rate limiting)
+btle_ignore_random=false
+
+# Track only APs for WiFi (performance optimization)
+dot11_ap_only_survey=true
+
+# Skip HT/VHT channels for faster hopping
+dot11_datasource_opt=ht_channels,false
+dot11_datasource_opt=vht_channels,false
+WIGLE_EOF
+    log_success "WiGLE export configuration created"
+
     log_success "Kismet configurations created"
 }
 
@@ -1805,7 +1841,19 @@ configure_filter_manager() {
     fi
     chmod +x /usr/local/bin/warpie-filter-processor.py
 
-    # 4. Install warpie-exclude-ssid.sh (legacy SSID management)
+    # 4. Install warpie-kismet-to-wigle.py (WiGLE CSV exporter with BTLE support)
+    if [[ -f "${SCRIPT_DIR}/../bin/warpie-kismet-to-wigle.py" ]]; then
+        cp "${SCRIPT_DIR}/../bin/warpie-kismet-to-wigle.py" /usr/local/bin/warpie-kismet-to-wigle.py
+    else
+        log_info "Downloading warpie-kismet-to-wigle.py..."
+        if ! curl -sSL "${base_url}/bin/warpie-kismet-to-wigle.py" -o /usr/local/bin/warpie-kismet-to-wigle.py; then
+            log_error "Failed to download warpie-kismet-to-wigle.py"
+            return 1
+        fi
+    fi
+    chmod +x /usr/local/bin/warpie-kismet-to-wigle.py
+
+    # 5. Install warpie-exclude-ssid.sh (legacy SSID management)
     if [[ -f "${SCRIPT_DIR}/../bin/warpie-exclude-ssid.sh" ]]; then
         cp "${SCRIPT_DIR}/../bin/warpie-exclude-ssid.sh" /usr/local/bin/warpie-exclude-ssid.sh
     else
@@ -1816,7 +1864,7 @@ configure_filter_manager() {
     fi
     [[ -f /usr/local/bin/warpie-exclude-ssid.sh ]] && chmod +x /usr/local/bin/warpie-exclude-ssid.sh
 
-    # 5. Install validate-warpie.sh (post-installation validator)
+    # 6. Install validate-warpie.sh (post-installation validator)
     if [[ -f "${SCRIPT_DIR}/../bin/validate-warpie.sh" ]]; then
         cp "${SCRIPT_DIR}/../bin/validate-warpie.sh" /usr/local/bin/validate-warpie.sh
     else
@@ -1827,7 +1875,7 @@ configure_filter_manager() {
     fi
     [[ -f /usr/local/bin/validate-warpie.sh ]] && chmod +x /usr/local/bin/validate-warpie.sh
 
-    # 6. Install filter processor systemd service
+    # 7. Install filter processor systemd service
     if [[ -f "${SCRIPT_DIR}/../systemd/warpie-filter-processor.service" ]]; then
         cp "${SCRIPT_DIR}/../systemd/warpie-filter-processor.service" /etc/systemd/system/
     else
@@ -2507,6 +2555,7 @@ print_summary() {
     echo "  - Known BSSIDs      : ${WARPIE_DIR}/known_bssids.conf"
     echo "  - Kismet site       : ${KISMET_CONF_DIR}/kismet_site.conf"
     echo "  - Wardrive mode     : ${KISMET_CONF_DIR}/kismet_wardrive.conf"
+    echo "  - WiGLE export      : ${KISMET_CONF_DIR}/kismet_wigle.conf"
     echo ""
     echo "Commands:"
     echo "  - Recovery          : sudo warpie-recovery.sh"
@@ -2563,6 +2612,7 @@ run_tests() {
     test_check "known_bssids.conf has entries" "grep -q '^[0-9a-fA-F]' ${WARPIE_DIR}/known_bssids.conf"
     test_check "kismet_site.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_site.conf ]]"
     test_check "kismet_wardrive.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wardrive.conf ]]"
+    test_check "kismet_wigle.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wigle.conf ]]"
     test_check "hostapd config exists" "[[ -f /etc/hostapd/hostapd-wlan0.conf ]]"
     
     echo ""
@@ -2573,6 +2623,7 @@ run_tests() {
     test_check "web package exists" "[[ -d /usr/local/share/warpie/web ]]"
     test_check "warpie-filter-manager.py exists" "[[ -x /usr/local/bin/warpie-filter-manager.py ]]"
     test_check "warpie-filter-processor.py exists" "[[ -x /usr/local/bin/warpie-filter-processor.py ]]"
+    test_check "warpie-kismet-to-wigle.py exists" "[[ -x /usr/local/bin/warpie-kismet-to-wigle.py ]]"
     test_check "validate-warpie.sh exists" "[[ -x /usr/local/bin/validate-warpie.sh ]]"
     test_check "warpie-recovery.sh exists" "[[ -x /usr/local/bin/warpie-recovery.sh ]]"
     
@@ -2721,6 +2772,7 @@ uninstall() {
     rm -f /usr/local/bin/warpie-exclude-ssid.sh
     rm -f /usr/local/bin/validate-warpie.sh
     rm -f /usr/local/bin/warpie-filter-processor.py
+    rm -f /usr/local/bin/warpie-kismet-to-wigle.py
     rm -f /usr/local/bin/warpie-filter-manager.py
     rm -f /usr/local/bin/warpie-filter-manager.sh
 
@@ -2731,10 +2783,12 @@ uninstall() {
     # Current config path
     rm -f /etc/kismet/kismet_site.conf
     rm -f /etc/kismet/kismet_wardrive.conf
+    rm -f /etc/kismet/kismet_wigle.conf
     rm -f /etc/kismet/kismet_targeting.conf
     # Old config path (in case of previous installs)
     rm -f /usr/local/etc/kismet_site.conf
     rm -f /usr/local/etc/kismet_wardrive.conf
+    rm -f /usr/local/etc/kismet_wigle.conf
     rm -f /usr/local/etc/kismet_targeting.conf
 
     # -------------------------------------------------------------------------
