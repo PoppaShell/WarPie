@@ -20,6 +20,17 @@
     <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
 </button>
 
+<button class="mode-btn {% if active_mode == 'wigle' %}active{% endif %}"
+        hx-post="/api/mode"
+        hx-vals='{"mode": "wigle"}'
+        hx-target="#status-panel"
+        hx-swap="innerHTML"
+        onclick="hideTargetPicker()">
+    <div class="mode-name">WIGLE</div>
+    <div class="mode-desc">WiFi+BT/BTLE</div>
+    <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
+</button>
+
 <button class="mode-btn {% if active_mode == 'targeted' %}active{% endif %}"
         onclick="showTargetPicker()">
     <div class="mode-name">TARGETED</div>

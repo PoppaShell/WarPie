@@ -30,6 +30,8 @@ def get_kismet_status() -> tuple[bool, str]:
             cmdline = result.stdout
             if "wardrive" in cmdline.lower():
                 return True, "Wardrive"
+            elif "wigle" in cmdline.lower():
+                return True, "Wigle"
             elif "targeted" in cmdline.lower():
                 return True, "Targeted"
             else:
@@ -58,7 +60,7 @@ def switch_mode(mode: str, target_lists: list[str] | None = None) -> bool:
     """Switch Kismet capture mode.
 
     Args:
-        mode: Mode to switch to (normal, wardrive, targeted, stop).
+        mode: Mode to switch to (normal, wardrive, wigle, targeted, stop).
         target_lists: List of target list IDs for targeted mode.
 
     Returns:
@@ -213,7 +215,7 @@ def api_mode():
     if not mode:
         return jsonify({"success": False, "error": "Mode required"}), 400
 
-    if mode not in ["normal", "wardrive", "targeted", "stop"]:
+    if mode not in ["normal", "wardrive", "wigle", "targeted", "stop"]:
         return jsonify({"success": False, "error": "Invalid mode"}), 400
 
     success = switch_mode(mode, target_lists)
