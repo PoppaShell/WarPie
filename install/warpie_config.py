@@ -379,10 +379,10 @@ def select_channels(band: str) -> str:
 
     if result == "custom":
         return inquirer.text(
-            message="Enter comma-separated channel list:",
+            message="Enter comma-separated channel list",
             validate=lambda x: len(x) > 0,
             qmark="",
-            amark="",
+            amark=": ",
         ).execute()
 
     return result
@@ -493,22 +493,22 @@ def configure_home_wifi() -> dict[str, str] | None:
 
     # Get SSID
     ssid = inquirer.text(
-        message="Home WiFi SSID:",
+        message="Home WiFi SSID",
         validate=lambda x: len(x.strip()) > 0,
         invalid_message="SSID cannot be empty",
         instruction="Enter your home WiFi network name",
         qmark="",
-        amark="",
+        amark=": ",
     ).execute()
 
     # Get password with masking
     password = inquirer.secret(
-        message="Home WiFi Password:",
+        message="Home WiFi Password",
         validate=lambda x: len(x) >= 8,
         invalid_message="Password must be at least 8 characters",
         instruction="Enter your WiFi password (hidden)",
         qmark="",
-        amark="",
+        amark=": ",
     ).execute()
 
     # Generate PSK hash for secure storage

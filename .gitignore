@@ -66,6 +66,7 @@ kismet_httpd.conf
 .env
 .env.local
 .env.*.local
+.mcp.json
 
 # =============================================================================
 # Backups

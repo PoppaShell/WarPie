@@ -1505,31 +1505,30 @@ WARDRIVE_EOF
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Wardrive config"
     fi
 
-    # WiGLE export overlay - optimized for BTLE export with our Python tool
-    cat > "${KISMET_CONF_DIR}/kismet_wigle.conf" << 'WIGLE_EOF'
-# WiGLE Export Mode - Optimized for BTLE/Bluetooth Export
-# Use with: kismet --override wigle
-# Or combine: kismet --override wardrive --override wigle
+    # Wardrive+BT mode - wardrive with Bluetooth/BTLE capture for WiGLE upload
+    cat > "${KISMET_CONF_DIR}/kismet_wardrive_bt.conf" << 'WARDRIVE_BT_EOF'
+# Wardrive+BT Mode - Wardrive with Bluetooth/BTLE Support
+# Use with: kismet --override wardrive_bt
 #
-# This overlay configures Kismet to capture all device types including BTLE
-# with full database logging for our warpie-kismet-to-wigle.py post-processor.
+# This mode captures WiFi APs + Bluetooth/BTLE devices with GPS correlation.
+# Use warpie-kismet-to-wigle.py to convert .kismet files to WiGLE CSV format.
 #
-# Unlike native wiglecsv log, this approach:
-# - Includes BTLE devices (native wiglecsv only exports WiFi)
-# - Correlates GPS from packets table for devices without direct GPS
+# Why use this instead of native wiglecsv?
+# - Native wiglecsv only exports WiFi, not BTLE devices
+# - Our post-processor correlates GPS from packets table
 # - Supports rate limiting and privacy filtering at export time
 
-# Enable kismetdb logging (required for our exporter)
+# Enable kismetdb logging (required for post-processing)
 log_types+=kismetdb
 
-# Disable native wiglecsv (we use our own post-processor)
+# Disable native wiglecsv (we use warpie-kismet-to-wigle.py instead)
 log_types-=wiglecsv
 
 # Log all packets for GPS correlation
 kis_log_packets=true
 
 # Don't ignore BTLE devices with random MACs
-# (Our exporter handles deduplication via rate limiting)
+# (Post-processor handles deduplication via rate limiting)
 btle_ignore_random=false
 
 # Track only APs for WiFi (performance optimization)
@@ -1538,8 +1537,8 @@ dot11_ap_only_survey=true
 # Skip HT/VHT channels for faster hopping
 dot11_datasource_opt=ht_channels,false
 dot11_datasource_opt=vht_channels,false
-WIGLE_EOF
-    log_success "WiGLE export configuration created"
+WARDRIVE_BT_EOF
+    log_success "Wardrive+BT configuration created"
 
     log_success "Kismet configurations created"
 }
@@ -2555,7 +2554,7 @@ print_summary() {
     echo "  - Known BSSIDs      : ${WARPIE_DIR}/known_bssids.conf"
     echo "  - Kismet site       : ${KISMET_CONF_DIR}/kismet_site.conf"
     echo "  - Wardrive mode     : ${KISMET_CONF_DIR}/kismet_wardrive.conf"
-    echo "  - WiGLE export      : ${KISMET_CONF_DIR}/kismet_wigle.conf"
+    echo "  - Wardrive+BT mode  : ${KISMET_CONF_DIR}/kismet_wardrive_bt.conf"
     echo ""
     echo "Commands:"
     echo "  - Recovery          : sudo warpie-recovery.sh"
@@ -2612,7 +2611,7 @@ run_tests() {
     test_check "known_bssids.conf has entries" "grep -q '^[0-9a-fA-F]' ${WARPIE_DIR}/known_bssids.conf"
     test_check "kismet_site.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_site.conf ]]"
     test_check "kismet_wardrive.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wardrive.conf ]]"
-    test_check "kismet_wigle.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wigle.conf ]]"
+    test_check "kismet_wardrive_bt.conf exists" "[[ -f ${KISMET_CONF_DIR}/kismet_wardrive_bt.conf ]]"
     test_check "hostapd config exists" "[[ -f /etc/hostapd/hostapd-wlan0.conf ]]"
     
     echo ""
@@ -2698,6 +2697,10 @@ uninstall() {
 
     echo -e "${YELLOW}This will remove all WarPie components and revert system changes.${NC}"
     echo ""
+    echo -e "${RED}WARNING: If you are connected via WiFi (WarPie AP or managed by warpie-network),${NC}"
+    echo -e "${RED}         you will be DISCONNECTED when network services are stopped.${NC}"
+    echo -e "${RED}         Use a wired connection or local console for uninstall.${NC}"
+    echo ""
     echo "The following will be removed:"
     echo "  - All WarPie systemd services"
     echo "  - All WarPie scripts from /usr/local/bin/"
@@ -2727,17 +2730,29 @@ uninstall() {
     pkill -f "hostapd.*warpie" 2>/dev/null || true
     pkill -f "dnsmasq.*warpie" 2>/dev/null || true
 
+    # Kill any remaining Kismet processes (needed to release monitor interfaces)
+    pkill -9 kismet 2>/dev/null || true
+    sleep 2  # Give interfaces time to be released
+
     # -------------------------------------------------------------------------
     # Remove monitor mode interfaces created by Kismet
     # -------------------------------------------------------------------------
     log_info "Removing monitor mode interfaces..."
-    for iface in /sys/class/net/*mon; do
+    local mon_count=0
+    for iface in /sys/class/net/*mon*; do
         if [[ -e "$iface" ]]; then
             iface_name=$(basename "$iface")
-            iw dev "$iface_name" del 2>/dev/null && \
-                log_success "Removed monitor interface: $iface_name" || true
+            if iw dev "$iface_name" del 2>/dev/null; then
+                log_success "Removed monitor interface: $iface_name"
+                ((mon_count++))
+            else
+                log_warn "Could not remove interface: $iface_name"
+            fi
         fi
     done
+    if [[ $mon_count -eq 0 ]]; then
+        log_info "No monitor interfaces found"
+    fi
 
     # -------------------------------------------------------------------------
     # Disable all WarPie services
@@ -2783,12 +2798,12 @@ uninstall() {
     # Current config path
     rm -f /etc/kismet/kismet_site.conf
     rm -f /etc/kismet/kismet_wardrive.conf
-    rm -f /etc/kismet/kismet_wigle.conf
+    rm -f /etc/kismet/kismet_wardrive_bt.conf
     rm -f /etc/kismet/kismet_targeting.conf
     # Old config path (in case of previous installs)
     rm -f /usr/local/etc/kismet_site.conf
     rm -f /usr/local/etc/kismet_wardrive.conf
-    rm -f /usr/local/etc/kismet_wigle.conf
+    rm -f /usr/local/etc/kismet_wardrive_bt.conf
     rm -f /usr/local/etc/kismet_targeting.conf
 
     # -------------------------------------------------------------------------

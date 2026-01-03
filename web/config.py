@@ -28,6 +28,10 @@ MODES = {
         "name": "Wardrive Mode",
         "desc": "AP-only, fast scan, exclusions applied",
     },
+    "wardrive_bt": {
+        "name": "Wardrive+BT",
+        "desc": "WiFi + BT/BTLE (use converter for WiGLE)",
+    },
     "targeted": {
         "name": "Targeted Devices",
         "desc": "Capture only from selected Target Lists",
