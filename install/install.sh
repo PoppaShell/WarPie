@@ -2731,17 +2731,29 @@ uninstall() {
     pkill -f "hostapd.*warpie" 2>/dev/null || true
     pkill -f "dnsmasq.*warpie" 2>/dev/null || true
 
+    # Kill any remaining Kismet processes (needed to release monitor interfaces)
+    pkill -9 kismet 2>/dev/null || true
+    sleep 2  # Give interfaces time to be released
+
     # -------------------------------------------------------------------------
     # Remove monitor mode interfaces created by Kismet
     # -------------------------------------------------------------------------
     log_info "Removing monitor mode interfaces..."
-    for iface in /sys/class/net/*mon; do
+    local mon_count=0
+    for iface in /sys/class/net/*mon*; do
         if [[ -e "$iface" ]]; then
             iface_name=$(basename "$iface")
-            iw dev "$iface_name" del 2>/dev/null && \
-                log_success "Removed monitor interface: $iface_name" || true
+            if iw dev "$iface_name" del 2>/dev/null; then
+                log_success "Removed monitor interface: $iface_name"
+                ((mon_count++))
+            else
+                log_warn "Could not remove interface: $iface_name"
+            fi
         fi
     done
+    if [[ $mon_count -eq 0 ]]; then
+        log_info "No monitor interfaces found"
+    fi
 
     # -------------------------------------------------------------------------
     # Disable all WarPie services
