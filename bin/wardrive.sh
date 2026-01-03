@@ -162,11 +162,11 @@ case "$MODE" in
         # shellcheck disable=SC2086
         exec kismet --no-ncurses --override wardrive ${CAPTURE_ARGS}
         ;;
-    wigle)
-        # WiGLE mode: captures WiFi + BT/BTLE with full database logging
+    wardrive_bt)
+        # Wardrive+BT mode: captures WiFi + BT/BTLE with full database logging
         # Use warpie-kismet-to-wigle.py to convert .kismet files to WiGLE CSV
         # shellcheck disable=SC2086
-        exec kismet --no-ncurses --override wigle ${CAPTURE_ARGS}
+        exec kismet --no-ncurses --override wardrive_bt ${CAPTURE_ARGS}
         ;;
     *)
         # shellcheck disable=SC2086

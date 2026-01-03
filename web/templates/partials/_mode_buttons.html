@@ -20,13 +20,13 @@
     <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
 </button>
 
-<button class="mode-btn {% if active_mode == 'wigle' %}active{% endif %}"
+<button class="mode-btn {% if active_mode == 'wardrive+bt' %}active{% endif %}"
         hx-post="/api/mode"
-        hx-vals='{"mode": "wigle"}'
+        hx-vals='{"mode": "wardrive_bt"}'
         hx-target="#status-panel"
         hx-swap="innerHTML"
         onclick="hideTargetPicker()">
-    <div class="mode-name">WIGLE</div>
+    <div class="mode-name">WARDRIVE+BT</div>
     <div class="mode-desc">WiFi+BT/BTLE</div>
     <span class="htmx-indicator mode-spinner"><span class="spinner"></span></span>
 </button>
