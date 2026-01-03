@@ -405,10 +405,16 @@ def _parse_wifi_device(device_json: str) -> tuple[str, str, int, int]:
         # Get SSID from various possible locations
         dot11 = device.get("dot11.device", {})
         advertised = dot11.get("dot11.device.advertised_ssid_map")
+        first_ssid_entry = None
         if advertised:
-            # Get first advertised SSID
-            first_ssid = next(iter(advertised.values()), {})
-            ssid = first_ssid.get("dot11.advertisedssid.ssid", "")
+            # Handle both list and dict formats (Kismet version differences)
+            if isinstance(advertised, list) and len(advertised) > 0:
+                first_ssid_entry = advertised[0]
+            elif isinstance(advertised, dict):
+                first_ssid_entry = next(iter(advertised.values()), {})
+
+            if first_ssid_entry:
+                ssid = first_ssid_entry.get("dot11.advertisedssid.ssid", "")
 
         # Fall back to other SSID fields
         if not ssid:
@@ -428,9 +434,8 @@ def _parse_wifi_device(device_json: str) -> tuple[str, str, int, int]:
         )
 
         # Get auth mode / encryption
-        if advertised:
-            first_ssid = next(iter(advertised.values()), {})
-            crypt = first_ssid.get("dot11.advertisedssid.crypt_set", 0)
+        if first_ssid_entry:
+            crypt = first_ssid_entry.get("dot11.advertisedssid.crypt_set", 0)
             auth_mode = _crypt_to_auth_mode(crypt)
 
     except (json.JSONDecodeError, TypeError, KeyError):
