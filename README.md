@@ -12,8 +12,9 @@ A complete wardriving and wireless research platform for Raspberry Pi OS, featur
 - **Multiple Capture Modes**:
   - **Normal**: Full device capture with exclusions applied
   - **Wardrive**: AP-only optimized scanning for mobile use
+  - **Wardrive+BT**: WiFi + Bluetooth/BTLE capture for WiGLE uploads
   - **Targeted**: Target specific device manufacturers by OUI prefix
-- **Optional BTLE Scanning**: Bluetooth Low Energy capture with supported adapters
+- **BTLE/BT WiGLE Export**: Custom converter works around [upstream Kismet bugs](https://github.com/kismetwireless/kismet/issues/514) that prevent BTLE export
 
 ## Minimum Requirements
 
@@ -103,6 +104,16 @@ Optimized for mobile scanning:
 - Management frames only
 - Lower CPU/memory usage
 
+### Wardrive+BT Mode
+
+Captures WiFi and Bluetooth/BTLE with full GPS correlation for WiGLE uploads:
+
+- Full kismetdb logging (required for BTLE extraction)
+- WiFi + BTLE + BT Classic device capture
+- Uses `warpie-kismet-to-wigle.py` converter for WiGLE CSV export
+
+**Why this mode exists**: Kismet's built-in WiGLE export has [upstream bugs](https://github.com/kismetwireless/kismet/issues/514) that cause 0 BTLE records in output, even though devices are captured correctly with GPS. This mode uses full database logging, then our custom converter properly extracts all device types.
+
 ### Targeted Mode
 
 Target specific device manufacturers by OUI prefix:
@@ -127,13 +138,14 @@ Removed during post-processing. For networks with rotating MACs. Wildcards suppo
 
 ## Configuration Files
 
-| File            | Location                          | Purpose                          |
-| --------------- | --------------------------------- | -------------------------------- |
-| Adapter Config  | `/etc/warpie/adapters.conf`       | Per-adapter band/channel settings |
-| Known BSSIDs    | `/etc/warpie/known_bssids.conf`   | Home networks for AP switching   |
-| Filter Rules    | `/etc/warpie/filter_rules.conf`   | Exclusions and target lists      |
-| Kismet Site     | `/etc/kismet/kismet_site.conf`    | Main Kismet config + GPS         |
-| Kismet Wardrive | `/etc/kismet/kismet_wardrive.conf` | Wardrive/Targeted optimizations  |
+| File               | Location                              | Purpose                           |
+| ------------------ | ------------------------------------- | --------------------------------- |
+| Adapter Config     | `/etc/warpie/adapters.conf`           | Per-adapter band/channel settings |
+| Known BSSIDs       | `/etc/warpie/known_bssids.conf`       | Home networks for AP switching    |
+| Filter Rules       | `/etc/warpie/filter_rules.conf`       | Exclusions and target lists       |
+| Kismet Site        | `/etc/kismet/kismet_site.conf`        | Main Kismet config + GPS          |
+| Kismet Wardrive    | `/etc/kismet/kismet_wardrive.conf`    | Wardrive/Targeted optimizations   |
+| Kismet Wardrive+BT | `/etc/kismet/kismet_wardrive_bt.conf` | Full DB logging for BTLE export   |
 
 ## Services
 
@@ -255,13 +267,32 @@ sudo warpie-recovery.sh
 
 ## WiGLE Upload
 
-Kismet creates WiGLE-compatible CSV files organized by mode and date:
+### Standard Wardrive Mode
+
+Kismet creates WiGLE-compatible CSV files (WiFi only):
 
 ```text
-/var/log/kismet/logs/<mode>/<date>/*.wiglecsv
+/var/log/kismet/logs/wardrive/<date>/*.wiglecsv
 ```
 
-Upload these to [wigle.net](https://wigle.net) to contribute to the wireless network database.
+### Wardrive+BT Mode (WiFi + Bluetooth)
+
+Wardrive+BT mode saves `.kismet` database files that must be converted:
+
+```bash
+# Convert a capture to WiGLE CSV (includes WiFi, BTLE, and BT Classic)
+warpie-kismet-to-wigle.py --in /var/log/kismet/logs/wardrive_bt/<date>/*.kismet --out export.csv
+
+# Preview without writing (shows device counts)
+warpie-kismet-to-wigle.py --in *.kismet --preview
+
+# Export with privacy exclusion zone
+warpie-kismet-to-wigle.py --in *.kismet --out export.csv --exclude-zone 36.1,-84.2,36.2,-84.1
+```
+
+The converter works around [upstream Kismet bugs](https://github.com/kismetwireless/kismet/issues/514) that prevent BTLE devices from being exported, even though they're captured with GPS coordinates.
+
+Upload the resulting CSV to [wigle.net](https://wigle.net) to contribute to the wireless network database.
 
 ## Project Structure
 
@@ -274,6 +305,7 @@ Upload these to [wigle.net](https://wigle.net) to contribute to the wireless net
 /etc/kismet/                    # Kismet configuration
   kismet_site.conf              # Main config + GPS
   kismet_wardrive.conf          # Wardrive/Targeted mode
+  kismet_wardrive_bt.conf       # Wardrive+BT mode (full DB logging)
 
 /usr/local/bin/                 # Executable scripts
   warpie-network-manager.sh     # AP/client switching
@@ -281,6 +313,7 @@ Upload these to [wigle.net](https://wigle.net) to contribute to the wireless net
   warpie-control                # Web control panel
   warpie-filter-manager.py      # Filter CLI tool
   warpie-filter-processor.py    # Post-processing daemon
+  warpie-kismet-to-wigle.py     # WiGLE CSV converter (WiFi + BTLE)
 
 /var/log/warpie/                # Application logs
 /var/log/kismet/logs/           # Kismet capture files

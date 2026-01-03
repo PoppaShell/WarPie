@@ -62,6 +62,24 @@ sudo warpie-filter-manager.py --remove "NetworkName"
 sudo warpie-filter-manager.py --json --list
 ```
 
+### WiGLE Export (Wardrive+BT Mode)
+
+```bash
+# Convert capture to WiGLE CSV (WiFi + BTLE + BT)
+warpie-kismet-to-wigle.py --in /var/log/kismet/logs/wardrive_bt/<date>/*.kismet --out export.csv
+
+# Preview device counts without writing
+warpie-kismet-to-wigle.py --in *.kismet --preview
+
+# Export with privacy exclusion zone (lat1,lon1,lat2,lon2)
+warpie-kismet-to-wigle.py --in *.kismet --out export.csv --exclude-zone 36.1,-84.2,36.2,-84.1
+
+# Show statistics only
+warpie-kismet-to-wigle.py --in *.kismet --stats
+```
+
+**Note**: Wardrive+BT mode uses full database logging instead of real-time WiGLE CSV because of [upstream Kismet bugs](https://github.com/kismetwireless/kismet/issues/514) that prevent BTLE export.
+
 ### GPS
 
 ```bash
