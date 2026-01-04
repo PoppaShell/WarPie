@@ -151,6 +151,134 @@ def get_cpu_load() -> list[float]:
 
 
 # =============================================================================
+# Phase 2: Enhanced Metric Collection Functions
+# =============================================================================
+
+
+def get_gps_status() -> dict:
+    """Get GPS status from gpspipe.
+
+    Queries gpsd via gpspipe to get current GPS fix quality,
+    satellite count, and lock status.
+
+    Returns:
+        Dict with status (NO_FIX/2D_FIX/3D_FIX), satellites (int), and
+        fix_quality (str). Returns safe defaults on failure.
+    """
+    try:
+        # Use gpspipe to query gpsd for TPV (time-position-velocity) data
+        result = subprocess.run(
+            ["gpspipe", "-w", "-n", "5"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+
+        if result.returncode == 0:
+            # Parse JSON output from gpspipe
+            # Look for TPV class messages with mode field
+            import json
+
+            satellites = 0
+            mode = 0  # 0=no fix, 2=2D, 3=3D
+
+            for line in result.stdout.strip().split("\n"):
+                try:
+                    data = json.loads(line)
+                    if data.get("class") == "TPV":
+                        mode = data.get("mode", 0)
+                    elif data.get("class") == "SKY":
+                        # Count satellites with signal
+                        satellites = len(data.get("satellites", []))
+                except json.JSONDecodeError:
+                    continue
+
+            # Determine status string
+            if mode == 3:
+                status = "3D_FIX"
+            elif mode == 2:
+                status = "2D_FIX"
+            else:
+                status = "NO_FIX"
+
+            return {
+                "status": status,
+                "satellites": satellites,
+                "fix_quality": status,
+            }
+    except Exception:
+        pass
+
+    return {
+        "status": "NO_FIX",
+        "satellites": 0,
+        "fix_quality": "NO_FIX",
+    }
+
+
+def get_adapter_status(interface: str) -> str:
+    """Get WiFi adapter status.
+
+    Checks if the specified interface (wlan1, wlan2) is UP.
+
+    Args:
+        interface: Interface name (e.g., "wlan1", "wlan2")
+
+    Returns:
+        "UP", "DOWN", or "NOT_FOUND"
+    """
+    try:
+        result = subprocess.run(
+            ["ip", "link", "show", interface],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=2,
+        )
+
+        if result.returncode == 0:
+            # Parse output for state
+            # Example: 2: wlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
+            if "state UP" in result.stdout or ",UP," in result.stdout:
+                return "UP"
+            else:
+                return "DOWN"
+        else:
+            return "NOT_FOUND"
+    except Exception:
+        return "NOT_FOUND"
+
+
+def get_capture_rate() -> float:
+    """Get current packet capture rate from Kismet.
+
+    Queries Kismet REST API for packets per second.
+
+    Returns:
+        Packets per second (float), or 0.0 on failure.
+    """
+    try:
+        import json
+        import urllib.request
+
+        # Query Kismet system status endpoint
+        url = "http://localhost:2501/system/status.json"
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+
+        with urllib.request.urlopen(req, timeout=2) as response:
+            data = json.loads(response.read().decode())
+
+            # Extract packets per second from system status
+            # The exact field may vary; check Kismet API docs
+            pps = data.get("kismet.system.packets_rrd", {}).get("kismet.common.rrd.last_time", 0)
+
+            return round(float(pps), 1)
+    except Exception:
+        return 0.0
+
+
+# =============================================================================
 # Phase 1: API Routes
 # =============================================================================
 
@@ -160,7 +288,8 @@ def api_performance():
     """Get performance metrics as JSON.
 
     Returns:
-        JSON with all Phase 1 metrics: cpu_temp, disk_usage, memory_usage, cpu_load.
+        JSON with all metrics: Phase 1 (cpu_temp, disk, memory, cpu_load)
+        and Phase 2 (gps, adapters, capture_rate).
     """
     return jsonify(
         {
@@ -168,6 +297,10 @@ def api_performance():
             "disk": get_disk_usage(),
             "memory": get_memory_usage(),
             "cpu_load": get_cpu_load(),
+            "gps": get_gps_status(),
+            "adapter_wlan1": get_adapter_status("wlan1"),
+            "adapter_wlan2": get_adapter_status("wlan2"),
+            "capture_rate": get_capture_rate(),
         }
     )
 
@@ -185,4 +318,8 @@ def api_performance_html():
         disk=get_disk_usage(),
         memory=get_memory_usage(),
         cpu_load=get_cpu_load(),
+        gps=get_gps_status(),
+        adapter_wlan1=get_adapter_status("wlan1"),
+        adapter_wlan2=get_adapter_status("wlan2"),
+        capture_rate=get_capture_rate(),
     )

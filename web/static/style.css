@@ -1246,3 +1246,16 @@ select option {
     min-width: 80px;
     text-align: right;
 }
+
+/* Status color variants for metric numbers */
+.metric-number.ok {
+    color: var(--fg);
+}
+
+.metric-number.warning {
+    color: var(--warning);
+}
+
+.metric-number.critical {
+    color: var(--error);
+}

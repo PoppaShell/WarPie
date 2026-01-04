@@ -243,6 +243,175 @@ class TestCPULoad:
         assert result == [0.0, 0.0, 0.0]
 
 
+class TestGPSStatus:
+    """Tests for get_gps_status()."""
+
+    @patch("subprocess.run")
+    def test_gps_3d_fix(self, mock_run):
+        """Returns 3D_FIX when GPS has 3D fix."""
+        from web.routes.performance import get_gps_status
+
+        # Simulate gpspipe output with 3D fix
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"class":"TPV","mode":3}\n{"class":"SKY","satellites":[{},{},{},{},{},{},{},{}]}\n',
+        )
+
+        result = get_gps_status()
+        assert result["status"] == "3D_FIX"
+        assert result["satellites"] == 8
+        assert result["fix_quality"] == "3D_FIX"
+
+    @patch("subprocess.run")
+    def test_gps_2d_fix(self, mock_run):
+        """Returns 2D_FIX when GPS has 2D fix."""
+        from web.routes.performance import get_gps_status
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='{"class":"TPV","mode":2}\n{"class":"SKY","satellites":[{},{},{},{}]}\n',
+        )
+
+        result = get_gps_status()
+        assert result["status"] == "2D_FIX"
+        assert result["satellites"] == 4
+
+    @patch("subprocess.run")
+    def test_gps_no_fix(self, mock_run):
+        """Returns NO_FIX when GPS has no fix."""
+        from web.routes.performance import get_gps_status
+
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout='{"class":"TPV","mode":0}\n'
+        )
+
+        result = get_gps_status()
+        assert result["status"] == "NO_FIX"
+        assert result["satellites"] == 0
+
+    @patch("subprocess.run")
+    def test_gps_command_failure(self, mock_run):
+        """Returns NO_FIX when gpspipe fails."""
+        from web.routes.performance import get_gps_status
+
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
+
+        result = get_gps_status()
+        assert result["status"] == "NO_FIX"
+
+    @patch("subprocess.run")
+    def test_gps_timeout(self, mock_run):
+        """Returns NO_FIX when gpspipe times out."""
+        from web.routes.performance import get_gps_status
+
+        mock_run.side_effect = subprocess.TimeoutExpired("gpspipe", 3)
+
+        result = get_gps_status()
+        assert result["status"] == "NO_FIX"
+
+
+class TestAdapterStatus:
+    """Tests for get_adapter_status()."""
+
+    @patch("subprocess.run")
+    def test_adapter_up(self, mock_run):
+        """Returns UP when adapter is up."""
+        from web.routes.performance import get_adapter_status
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="2: wlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
+        )
+
+        result = get_adapter_status("wlan1")
+        assert result == "UP"
+
+    @patch("subprocess.run")
+    def test_adapter_down(self, mock_run):
+        """Returns DOWN when adapter is down."""
+        from web.routes.performance import get_adapter_status
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="2: wlan1: <BROADCAST,MULTICAST> mtu 1500\n",
+        )
+
+        result = get_adapter_status("wlan1")
+        assert result == "DOWN"
+
+    @patch("subprocess.run")
+    def test_adapter_not_found(self, mock_run):
+        """Returns NOT_FOUND when adapter doesn't exist."""
+        from web.routes.performance import get_adapter_status
+
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
+
+        result = get_adapter_status("wlan999")
+        assert result == "NOT_FOUND"
+
+    @patch("subprocess.run")
+    def test_adapter_command_timeout(self, mock_run):
+        """Returns NOT_FOUND when command times out."""
+        from web.routes.performance import get_adapter_status
+
+        mock_run.side_effect = subprocess.TimeoutExpired("ip", 2)
+
+        result = get_adapter_status("wlan1")
+        assert result == "NOT_FOUND"
+
+
+class TestCaptureRate:
+    """Tests for get_capture_rate()."""
+
+    @patch("urllib.request.urlopen")
+    def test_capture_rate_success(self, mock_urlopen):
+        """Returns capture rate from Kismet API."""
+        from web.routes.performance import get_capture_rate
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"kismet.system.packets_rrd":{"kismet.common.rrd.last_time":245.6}}'
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        result = get_capture_rate()
+        assert result == 245.6
+
+    @patch("urllib.request.urlopen")
+    def test_capture_rate_zero(self, mock_urlopen):
+        """Returns 0.0 when no packets."""
+        from web.routes.performance import get_capture_rate
+
+        mock_response = MagicMock()
+        mock_response.read.return_value = b'{"kismet.system.packets_rrd":{"kismet.common.rrd.last_time":0}}'
+        mock_response.__enter__.return_value = mock_response
+        mock_urlopen.return_value = mock_response
+
+        result = get_capture_rate()
+        assert result == 0.0
+
+    @patch("urllib.request.urlopen")
+    def test_capture_rate_connection_error(self, mock_urlopen):
+        """Returns 0.0 when Kismet is unreachable."""
+        from web.routes.performance import get_capture_rate
+
+        mock_urlopen.side_effect = OSError("Connection refused")
+
+        result = get_capture_rate()
+        assert result == 0.0
+
+    @patch("urllib.request.urlopen")
+    def test_capture_rate_timeout(self, mock_urlopen):
+        """Returns 0.0 when request times out."""
+        from web.routes.performance import get_capture_rate
+
+        import socket
+
+        mock_urlopen.side_effect = socket.timeout("Request timed out")
+
+        result = get_capture_rate()
+        assert result == 0.0
+
+
 class TestPerformanceRoutes:
     """Tests for performance API routes."""
 
@@ -259,8 +428,19 @@ class TestPerformanceRoutes:
     @patch("web.routes.performance.get_disk_usage")
     @patch("web.routes.performance.get_memory_usage")
     @patch("web.routes.performance.get_cpu_load")
+    @patch("web.routes.performance.get_gps_status")
+    @patch("web.routes.performance.get_adapter_status")
+    @patch("web.routes.performance.get_capture_rate")
     def test_api_performance_returns_json(
-        self, mock_load, mock_memory, mock_disk, mock_temp, client
+        self,
+        mock_capture,
+        mock_adapter,
+        mock_gps,
+        mock_load,
+        mock_memory,
+        mock_disk,
+        mock_temp,
+        client,
     ):
         """Performance API returns JSON with all metrics."""
         mock_temp.return_value = 65.5
@@ -277,6 +457,13 @@ class TestPerformanceRoutes:
             "used_percent": 50.0,
         }
         mock_load.return_value = [1.2, 1.5, 1.8]
+        mock_gps.return_value = {
+            "status": "3D_FIX",
+            "satellites": 8,
+            "fix_quality": "3D_FIX",
+        }
+        mock_adapter.side_effect = ["UP", "UP"]  # wlan1, wlan2
+        mock_capture.return_value = 245.6
 
         response = client.get("/api/performance")
         assert response.status_code == 200
@@ -288,6 +475,11 @@ class TestPerformanceRoutes:
         assert data["disk"]["used_percent"] == 50
         assert data["memory"]["used_percent"] == 50.0
         assert data["cpu_load"] == [1.2, 1.5, 1.8]
+        assert data["gps"]["status"] == "3D_FIX"
+        assert data["gps"]["satellites"] == 8
+        assert data["adapter_wlan1"] == "UP"
+        assert data["adapter_wlan2"] == "UP"
+        assert data["capture_rate"] == 245.6
 
     @patch("web.routes.performance.get_cpu_temperature")
     @patch("web.routes.performance.get_disk_usage")
