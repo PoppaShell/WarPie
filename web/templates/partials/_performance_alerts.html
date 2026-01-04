@@ -1,0 +1,13 @@
+{% if alerts %}
+{% set alert = alerts[0] %}
+<div class="perf-alert-banner {{ alert.level }}">
+    <div class="alert-content">
+        <span class="alert-icon">{% if alert.level == 'critical' or alert.level == 'action' %}🔴{% else %}🟡{% endif %}</span>
+        <span class="alert-text">
+            {{ alert.metric|upper|replace('_', ' ') }}: {{ alert.value }}{{ alert.unit }}
+            (Threshold: {{ alert.threshold }}{{ alert.unit }})
+        </span>
+    </div>
+    <button class="alert-dismiss" onclick="dismissAlert('{{ alert.metric }}')">✕</button>
+</div>
+{% endif %}

@@ -4,12 +4,69 @@ Handles system performance metrics, threshold monitoring, and automatic
 response actions for the WarPie Raspberry Pi wardriving platform.
 """
 
+import json
+import os
+import re
 import subprocess
+import time
 from pathlib import Path
 
-from flask import Blueprint, jsonify, render_template
+from flask import Blueprint, jsonify, render_template, request
 
 performance_bp = Blueprint("performance", __name__)
+
+# =============================================================================
+# Phase 3: Configuration and Constants
+# =============================================================================
+
+PERFORMANCE_CONFIG = "/etc/warpie/performance_thresholds.conf"
+PERFORMANCE_LOG = "/var/log/warpie/performance_actions.log"
+
+# Default threshold configuration
+DEFAULT_CONFIG = {
+    "cpu_temp": {
+        "enabled": True,
+        "warning_threshold": 75,
+        "critical_threshold": 80,
+        "action_threshold": 85,
+        "response_action": "stop_kismet",
+        "custom_command": None,
+    },
+    "disk_usage": {
+        "enabled": True,
+        "warning_threshold": 80,
+        "critical_threshold": 85,
+        "action_threshold": 90,
+        "response_action": "stop_and_shutdown",
+        "custom_command": None,
+    },
+    "memory_usage": {
+        "enabled": True,
+        "warning_threshold": 80,
+        "critical_threshold": 85,
+        "action_threshold": 90,
+        "response_action": "none",
+        "custom_command": None,
+    },
+    "global_settings": {
+        "auto_actions_enabled": True,
+        "refresh_interval_seconds": 5,
+        "action_cooldown_seconds": 300,
+    },
+}
+
+# Dangerous command patterns to block
+DANGEROUS_PATTERNS = [
+    r"rm\s+-rf",
+    r"dd\s+",
+    r"mkfs\.",
+    r">/dev/sd",
+    r"curl.*\|.*sh",
+    r"wget.*\|.*sh",
+]
+
+# Track last action times for cooldown
+last_actions = {}
 
 
 # =============================================================================
@@ -279,6 +336,301 @@ def get_capture_rate() -> float:
 
 
 # =============================================================================
+# Phase 3: Threshold Management and Action Execution
+# =============================================================================
+
+
+def load_threshold_config() -> dict:
+    """Load threshold configuration from file.
+
+    Returns:
+        Threshold config dict, or defaults if file doesn't exist or is corrupted.
+    """
+    try:
+        if os.path.exists(PERFORMANCE_CONFIG):
+            with open(PERFORMANCE_CONFIG) as f:
+                return json.load(f)
+    except Exception:
+        pass
+
+    return DEFAULT_CONFIG.copy()
+
+
+def save_threshold_config(config: dict) -> bool:
+    """Save threshold configuration atomically.
+
+    Args:
+        config: Threshold configuration dict to save
+
+    Returns:
+        True on success, False on failure
+    """
+    try:
+        # Ensure directory exists
+        os.makedirs(os.path.dirname(PERFORMANCE_CONFIG), exist_ok=True)
+
+        # Atomic write using temp file
+        temp_path = PERFORMANCE_CONFIG + ".tmp"
+        with open(temp_path, "w") as f:
+            json.dump(config, f, indent=2)
+
+        # Atomic replace
+        os.replace(temp_path, PERFORMANCE_CONFIG)
+        return True
+    except Exception:
+        return False
+
+
+def evaluate_thresholds(metrics: dict, config: dict) -> list[dict]:
+    """Evaluate metrics against thresholds.
+
+    Args:
+        metrics: Dict with cpu_temp, disk, memory, etc.
+        config: Threshold configuration
+
+    Returns:
+        List of alert dicts with metric, level, value, threshold
+    """
+    alerts = []
+
+    # Check CPU temperature
+    if config.get("cpu_temp", {}).get("enabled", True):
+        temp = metrics.get("cpu_temp", 0.0)
+        thresholds = config.get("cpu_temp", {})
+
+        if temp >= thresholds.get("action_threshold", 85):
+            alerts.append(
+                {
+                    "metric": "cpu_temp",
+                    "level": "action",
+                    "value": temp,
+                    "threshold": thresholds["action_threshold"],
+                    "unit": "°C",
+                }
+            )
+        elif temp >= thresholds.get("critical_threshold", 80):
+            alerts.append(
+                {
+                    "metric": "cpu_temp",
+                    "level": "critical",
+                    "value": temp,
+                    "threshold": thresholds["critical_threshold"],
+                    "unit": "°C",
+                }
+            )
+        elif temp >= thresholds.get("warning_threshold", 75):
+            alerts.append(
+                {
+                    "metric": "cpu_temp",
+                    "level": "warning",
+                    "value": temp,
+                    "threshold": thresholds["warning_threshold"],
+                    "unit": "°C",
+                }
+            )
+
+    # Check disk usage
+    if config.get("disk_usage", {}).get("enabled", True):
+        disk_percent = metrics.get("disk", {}).get("used_percent", 0)
+        thresholds = config.get("disk_usage", {})
+
+        if disk_percent >= thresholds.get("action_threshold", 90):
+            alerts.append(
+                {
+                    "metric": "disk_usage",
+                    "level": "action",
+                    "value": disk_percent,
+                    "threshold": thresholds["action_threshold"],
+                    "unit": "%",
+                }
+            )
+        elif disk_percent >= thresholds.get("critical_threshold", 85):
+            alerts.append(
+                {
+                    "metric": "disk_usage",
+                    "level": "critical",
+                    "value": disk_percent,
+                    "threshold": thresholds["critical_threshold"],
+                    "unit": "%",
+                }
+            )
+        elif disk_percent >= thresholds.get("warning_threshold", 80):
+            alerts.append(
+                {
+                    "metric": "disk_usage",
+                    "level": "warning",
+                    "value": disk_percent,
+                    "threshold": thresholds["warning_threshold"],
+                    "unit": "%",
+                }
+            )
+
+    # Check memory usage
+    if config.get("memory_usage", {}).get("enabled", True):
+        memory_percent = metrics.get("memory", {}).get("used_percent", 0.0)
+        thresholds = config.get("memory_usage", {})
+
+        if memory_percent >= thresholds.get("action_threshold", 90):
+            alerts.append(
+                {
+                    "metric": "memory_usage",
+                    "level": "action",
+                    "value": memory_percent,
+                    "threshold": thresholds["action_threshold"],
+                    "unit": "%",
+                }
+            )
+        elif memory_percent >= thresholds.get("critical_threshold", 85):
+            alerts.append(
+                {
+                    "metric": "memory_usage",
+                    "level": "critical",
+                    "value": memory_percent,
+                    "threshold": thresholds["critical_threshold"],
+                    "unit": "%",
+                }
+            )
+        elif memory_percent >= thresholds.get("warning_threshold", 80):
+            alerts.append(
+                {
+                    "metric": "memory_usage",
+                    "level": "warning",
+                    "value": memory_percent,
+                    "threshold": thresholds["warning_threshold"],
+                    "unit": "%",
+                }
+            )
+
+    return alerts
+
+
+def validate_custom_command(cmd: str) -> bool:
+    """Validate custom command for dangerous patterns.
+
+    Args:
+        cmd: Command string to validate
+
+    Returns:
+        True if safe, False if dangerous
+    """
+    for pattern in DANGEROUS_PATTERNS:
+        if re.search(pattern, cmd, re.IGNORECASE):
+            return False
+    return True
+
+
+def can_execute_action(metric: str, cooldown: int) -> bool:
+    """Check if action can be executed based on cooldown.
+
+    Args:
+        metric: Metric name (e.g., "cpu_temp")
+        cooldown: Cooldown period in seconds
+
+    Returns:
+        True if cooldown has elapsed or no previous action
+    """
+    if metric not in last_actions:
+        return True
+
+    elapsed = time.time() - last_actions[metric]
+    return elapsed > cooldown
+
+
+def log_action(metric: str, value: float, level: str, action: str, success: bool):
+    """Log action to performance log file.
+
+    Args:
+        metric: Metric that triggered action
+        value: Metric value
+        level: Alert level (warning/critical/action)
+        action: Action taken
+        success: Whether action succeeded
+    """
+    try:
+        os.makedirs(os.path.dirname(PERFORMANCE_LOG), exist_ok=True)
+
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        status = "SUCCESS" if success else "FAILED"
+        log_entry = f"{timestamp} | {metric} | {value} | {level} | {action} | {status}\n"
+
+        with open(PERFORMANCE_LOG, "a") as f:
+            f.write(log_entry)
+    except Exception:
+        pass
+
+
+def execute_action(metric: str, action: str, custom_cmd: str | None, value: float) -> bool:
+    """Execute response action with safety checks.
+
+    Args:
+        metric: Metric that triggered action
+        action: Action type (stop_kismet/stop_and_shutdown/custom)
+        custom_cmd: Custom command if action is "custom"
+        value: Metric value that triggered action
+
+    Returns:
+        True if action executed successfully
+    """
+    try:
+        if action == "stop_kismet":
+            result = subprocess.run(
+                ["systemctl", "stop", "wardrive.service"],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+            success = result.returncode == 0
+
+        elif action == "stop_and_shutdown":
+            # Stop Kismet first
+            subprocess.run(
+                ["systemctl", "stop", "wardrive.service"],
+                check=False,
+                timeout=10,
+            )
+            # Initiate shutdown
+            result = subprocess.run(
+                ["sudo", "shutdown", "-h", "+1"],
+                check=False,
+                capture_output=True,
+                timeout=5,
+            )
+            success = result.returncode == 0
+
+        elif action == "custom" and custom_cmd:
+            # Validate before executing
+            if not validate_custom_command(custom_cmd):
+                log_action(metric, value, "action", f"custom:{custom_cmd}", False)
+                return False
+
+            result = subprocess.run(
+                custom_cmd,
+                shell=True,
+                check=False,
+                capture_output=True,
+                timeout=30,
+            )
+            success = result.returncode == 0
+
+        else:
+            # Unknown action or "none"
+            return False
+
+        # Log the action
+        log_action(metric, value, "action", action, success)
+
+        # Update last action time if successful
+        if success:
+            last_actions[metric] = time.time()
+
+        return success
+
+    except Exception:
+        log_action(metric, value, "action", action, False)
+        return False
+
+
+# =============================================================================
 # Phase 1: API Routes
 # =============================================================================
 
@@ -323,3 +675,171 @@ def api_performance_html():
         adapter_wlan2=get_adapter_status("wlan2"),
         capture_rate=get_capture_rate(),
     )
+
+
+# =============================================================================
+# Phase 3: API Routes
+# =============================================================================
+
+
+@performance_bp.route("/performance/alerts")
+def api_alerts():
+    """Get current alerts as JSON.
+
+    Returns:
+        JSON with list of active alerts
+    """
+    metrics = {
+        "cpu_temp": get_cpu_temperature(),
+        "disk": get_disk_usage(),
+        "memory": get_memory_usage(),
+    }
+
+    config = load_threshold_config()
+    alerts = evaluate_thresholds(metrics, config)
+
+    # Auto-execute actions for action-level alerts
+    if config.get("global_settings", {}).get("auto_actions_enabled", True):
+        cooldown = config.get("global_settings", {}).get("action_cooldown_seconds", 300)
+
+        for alert in alerts:
+            if alert["level"] == "action":
+                metric_key = alert["metric"]
+                metric_config = config.get(metric_key, {})
+
+                if can_execute_action(metric_key, cooldown):
+                    action = metric_config.get("response_action", "none")
+                    custom_cmd = metric_config.get("custom_command")
+
+                    execute_action(metric_key, action, custom_cmd, alert["value"])
+
+    return jsonify({"alerts": alerts})
+
+
+@performance_bp.route("/performance/alerts/html")
+def api_alerts_html():
+    """Get alert banner as HTML fragment.
+
+    Returns:
+        HTML partial for alert banner on main dashboard
+    """
+    metrics = {
+        "cpu_temp": get_cpu_temperature(),
+        "disk": get_disk_usage(),
+        "memory": get_memory_usage(),
+    }
+
+    config = load_threshold_config()
+    alerts = evaluate_thresholds(metrics, config)
+
+    return render_template("partials/_performance_alerts.html", alerts=alerts)
+
+
+@performance_bp.route("/performance/config")
+def api_config_get():
+    """Get threshold configuration as JSON.
+
+    Returns:
+        JSON with current threshold config
+    """
+    return jsonify(load_threshold_config())
+
+
+@performance_bp.route("/performance/config", methods=["POST"])
+def api_config_post():
+    """Save threshold configuration.
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        config = request.get_json()
+
+        if not config:
+            return jsonify({"success": False, "error": "No config provided"}), 400
+
+        # Basic validation
+        required_keys = ["cpu_temp", "disk_usage", "memory_usage", "global_settings"]
+        if not all(key in config for key in required_keys):
+            return jsonify({"success": False, "error": "Missing required config keys"}), 400
+
+        if save_threshold_config(config):
+            return jsonify({"success": True})
+        else:
+            return jsonify({"success": False, "error": "Failed to save config"}), 500
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@performance_bp.route("/performance/dismiss", methods=["POST"])
+def api_dismiss_alert():
+    """Dismiss an alert (client-side only).
+
+    Returns:
+        JSON with success status
+    """
+    # This endpoint exists for client-side alert dismissal
+    # The actual dismissal happens in JavaScript
+    return jsonify({"success": True})
+
+
+@performance_bp.route("/performance/history")
+def api_history():
+    """Get action execution history.
+
+    Returns:
+        JSON with recent action history
+    """
+    try:
+        if not os.path.exists(PERFORMANCE_LOG):
+            return jsonify({"history": []})
+
+        with open(PERFORMANCE_LOG) as f:
+            lines = f.readlines()[-50:]  # Last 50 entries
+
+        history = []
+        for line in lines:
+            parts = line.strip().split(" | ")
+            if len(parts) >= 6:
+                history.append(
+                    {
+                        "timestamp": parts[0],
+                        "metric": parts[1],
+                        "value": parts[2],
+                        "level": parts[3],
+                        "action": parts[4],
+                        "status": parts[5],
+                    }
+                )
+
+        return jsonify({"history": history})
+
+    except Exception:
+        return jsonify({"history": []})
+
+
+@performance_bp.route("/performance/test-action", methods=["POST"])
+def api_test_action():
+    """Test an action without cooldown restrictions.
+
+    Returns:
+        JSON with success status
+    """
+    try:
+        data = request.get_json()
+        metric = data.get("metric")
+        action = data.get("action")
+        custom_cmd = data.get("custom_cmd")
+        value = data.get("value", 0.0)
+
+        if not metric or not action:
+            return jsonify({"success": False, "error": "Missing metric or action"}), 400
+
+        # Execute without checking cooldown
+        success = execute_action(metric, action, custom_cmd, value)
+
+        return jsonify({"success": success})
+
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500

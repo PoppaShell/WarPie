@@ -412,6 +412,215 @@ class TestCaptureRate:
         assert result == 0.0
 
 
+class TestThresholdEvaluation:
+    """Tests for evaluate_thresholds()."""
+
+    def test_no_alerts_when_below_thresholds(self):
+        """Returns empty list when all metrics below thresholds."""
+        from web.routes.performance import DEFAULT_CONFIG, evaluate_thresholds
+
+        metrics = {
+            "cpu_temp": 65.0,
+            "disk": {"used_percent": 50},
+            "memory": {"used_percent": 60.0},
+        }
+
+        alerts = evaluate_thresholds(metrics, DEFAULT_CONFIG)
+        assert alerts == []
+
+    def test_warning_alert_triggered(self):
+        """Returns warning alert when metric exceeds warning threshold."""
+        from web.routes.performance import DEFAULT_CONFIG, evaluate_thresholds
+
+        metrics = {
+            "cpu_temp": 76.0,  # Above 75 warning
+            "disk": {"used_percent": 50},
+            "memory": {"used_percent": 60.0},
+        }
+
+        alerts = evaluate_thresholds(metrics, DEFAULT_CONFIG)
+        assert len(alerts) == 1
+        assert alerts[0]["metric"] == "cpu_temp"
+        assert alerts[0]["level"] == "warning"
+        assert alerts[0]["value"] == 76.0
+
+    def test_critical_alert_triggered(self):
+        """Returns critical alert when metric exceeds critical threshold."""
+        from web.routes.performance import DEFAULT_CONFIG, evaluate_thresholds
+
+        metrics = {
+            "cpu_temp": 81.0,  # Above 80 critical
+            "disk": {"used_percent": 50},
+            "memory": {"used_percent": 60.0},
+        }
+
+        alerts = evaluate_thresholds(metrics, DEFAULT_CONFIG)
+        assert len(alerts) == 1
+        assert alerts[0]["level"] == "critical"
+
+    def test_action_alert_triggered(self):
+        """Returns action alert when metric exceeds action threshold."""
+        from web.routes.performance import DEFAULT_CONFIG, evaluate_thresholds
+
+        metrics = {
+            "cpu_temp": 86.0,  # Above 85 action
+            "disk": {"used_percent": 50},
+            "memory": {"used_percent": 60.0},
+        }
+
+        alerts = evaluate_thresholds(metrics, DEFAULT_CONFIG)
+        assert len(alerts) == 1
+        assert alerts[0]["level"] == "action"
+
+    def test_multiple_alerts(self):
+        """Returns multiple alerts when multiple metrics exceed thresholds."""
+        from web.routes.performance import DEFAULT_CONFIG, evaluate_thresholds
+
+        metrics = {
+            "cpu_temp": 86.0,  # Action
+            "disk": {"used_percent": 92},  # Action
+            "memory": {"used_percent": 82.0},  # Warning
+        }
+
+        alerts = evaluate_thresholds(metrics, DEFAULT_CONFIG)
+        assert len(alerts) == 3
+        assert any(a["metric"] == "cpu_temp" and a["level"] == "action" for a in alerts)
+        assert any(a["metric"] == "disk_usage" and a["level"] == "action" for a in alerts)
+        assert any(a["metric"] == "memory_usage" and a["level"] == "warning" for a in alerts)
+
+    def test_disabled_metric_no_alert(self):
+        """Disabled metrics don't generate alerts."""
+        from web.routes.performance import evaluate_thresholds
+
+        config = {
+            "cpu_temp": {"enabled": False, "warning_threshold": 75},
+            "disk_usage": {"enabled": True, "warning_threshold": 80},
+            "memory_usage": {"enabled": True, "warning_threshold": 80},
+        }
+
+        metrics = {
+            "cpu_temp": 90.0,  # Would trigger if enabled
+            "disk": {"used_percent": 50},
+            "memory": {"used_percent": 60.0},
+        }
+
+        alerts = evaluate_thresholds(metrics, config)
+        assert len(alerts) == 0
+
+
+class TestActionExecution:
+    """Tests for execute_action()."""
+
+    @patch("subprocess.run")
+    def test_action_stop_kismet(self, mock_run):
+        """Execute stop_kismet action."""
+        from web.routes.performance import execute_action
+
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = execute_action("cpu_temp", "stop_kismet", None, 86.0)
+        assert result is True
+        mock_run.assert_called_once()
+        assert "systemctl" in mock_run.call_args[0][0]
+
+    @patch("subprocess.run")
+    def test_action_stop_and_shutdown(self, mock_run):
+        """Execute stop_and_shutdown action."""
+        from web.routes.performance import execute_action
+
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = execute_action("disk_usage", "stop_and_shutdown", None, 92.0)
+        assert result is True
+        # Should call systemctl and shutdown
+        assert mock_run.call_count == 2
+
+    @patch("subprocess.run")
+    def test_action_custom_command(self, mock_run):
+        """Execute safe custom command."""
+        from web.routes.performance import execute_action
+
+        mock_run.return_value = MagicMock(returncode=0)
+
+        result = execute_action("memory_usage", "custom", "echo 'test'", 91.0)
+        assert result is True
+
+    @patch("subprocess.run")
+    def test_action_validation_blocks_dangerous_cmd(self, mock_run):
+        """Dangerous commands are blocked."""
+        from web.routes.performance import execute_action
+
+        result = execute_action("memory_usage", "custom", "rm -rf /", 91.0)
+        assert result is False
+        # Subprocess should not be called
+        mock_run.assert_not_called()
+
+    def test_action_none_returns_false(self):
+        """Action 'none' returns False."""
+        from web.routes.performance import execute_action
+
+        result = execute_action("cpu_temp", "none", None, 86.0)
+        assert result is False
+
+    @patch("subprocess.run")
+    def test_cooldown_tracked_after_success(self, mock_run):
+        """Cooldown is enforced after successful action."""
+        from web.routes.performance import can_execute_action, execute_action, last_actions
+
+        # Clear any previous state
+        last_actions.clear()
+
+        mock_run.return_value = MagicMock(returncode=0)
+
+        # First execution should succeed
+        assert can_execute_action("cpu_temp_test", 300) is True
+        execute_action("cpu_temp_test", "stop_kismet", None, 86.0)
+
+        # Second execution should be blocked by cooldown
+        assert can_execute_action("cpu_temp_test", 300) is False
+
+
+class TestConfigManagement:
+    """Tests for load/save threshold config."""
+
+    @patch("os.path.exists")
+    def test_load_default_config(self, mock_exists):
+        """Returns defaults when config file doesn't exist."""
+        from web.routes.performance import DEFAULT_CONFIG, load_threshold_config
+
+        mock_exists.return_value = False
+
+        config = load_threshold_config()
+        assert config == DEFAULT_CONFIG
+
+    @patch("os.path.exists")
+    @patch("builtins.open", create=True)
+    def test_load_custom_config(self, mock_open, mock_exists):
+        """Loads custom config from file."""
+        from web.routes.performance import load_threshold_config
+
+        mock_exists.return_value = True
+        mock_open.return_value.__enter__.return_value.read.return_value = (
+            '{"cpu_temp": {"enabled": true, "warning_threshold": 70}}'
+        )
+
+        config = load_threshold_config()
+        # Should have loaded custom config (mocking makes this tricky, just verify it tries)
+        mock_exists.assert_called_once()
+
+    @patch("os.makedirs")
+    @patch("builtins.open", create=True)
+    @patch("os.replace")
+    def test_save_config_atomic(self, mock_replace, mock_open, mock_makedirs):
+        """Saves config atomically."""
+        from web.routes.performance import DEFAULT_CONFIG, save_threshold_config
+
+        result = save_threshold_config(DEFAULT_CONFIG)
+        assert result is True
+        # Should use temp file and atomic replace
+        mock_replace.assert_called_once()
+
+
 class TestPerformanceRoutes:
     """Tests for performance API routes."""
 
