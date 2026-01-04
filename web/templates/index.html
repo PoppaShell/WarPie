@@ -7,6 +7,13 @@
     <h1>WARPIE CONTROLLER</h1>
 </header>
 
+<!-- Performance Alert Banner -->
+<div id="perf-alert-banner"
+     hx-get="/api/performance/alerts/html"
+     hx-trigger="load, every 10s"
+     hx-swap="innerHTML">
+</div>
+
 <!-- Status Panel -->
 <div class="terminal-box" id="status-panel"
      hx-get="/api/status/html"

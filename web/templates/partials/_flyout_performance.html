@@ -15,5 +15,131 @@
         </div>
     </div>
 
-    <!-- Phase 2/3 sections will be added later -->
+    <!-- Section 2: Threshold Settings -->
+    <div class="perf-section">
+        <h3>THRESHOLD SETTINGS</h3>
+        <button class="accordion" onclick="toggleSettings()">
+            CONFIGURE THRESHOLDS [+]
+        </button>
+        <div class="accordion-content hidden" id="threshold-settings">
+            <!-- CPU Temperature Thresholds -->
+            <div class="threshold-metric">
+                <h4>CPU TEMPERATURE (°C)</h4>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Warning:</span>
+                        <span id="cpu_temp-warning-value">75</span>°C
+                    </label>
+                    <input type="range" id="cpu_temp-warning" min="60" max="90" value="75"
+                           oninput="updateThreshold('cpu_temp', 'warning', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Critical:</span>
+                        <span id="cpu_temp-critical-value">80</span>°C
+                    </label>
+                    <input type="range" id="cpu_temp-critical" min="60" max="90" value="80"
+                           oninput="updateThreshold('cpu_temp', 'critical', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Action:</span>
+                        <span id="cpu_temp-action-value">85</span>°C
+                    </label>
+                    <input type="range" id="cpu_temp-action" min="60" max="90" value="85"
+                           oninput="updateThreshold('cpu_temp', 'action', this.value)">
+                </div>
+                <div class="response-select">
+                    <label>Response Action:</label>
+                    <select id="cpu_temp-response" onchange="updateResponseAction('cpu_temp', this.value)">
+                        <option value="none">None</option>
+                        <option value="stop_kismet" selected>Stop Kismet</option>
+                        <option value="stop_and_shutdown">Stop + Shutdown</option>
+                        <option value="custom">Custom Command</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Disk Usage Thresholds -->
+            <div class="threshold-metric">
+                <h4>DISK USAGE (%)</h4>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Warning:</span>
+                        <span id="disk_usage-warning-value">80</span>%
+                    </label>
+                    <input type="range" id="disk_usage-warning" min="70" max="95" value="80"
+                           oninput="updateThreshold('disk_usage', 'warning', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Critical:</span>
+                        <span id="disk_usage-critical-value">85</span>%
+                    </label>
+                    <input type="range" id="disk_usage-critical" min="70" max="95" value="85"
+                           oninput="updateThreshold('disk_usage', 'critical', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Action:</span>
+                        <span id="disk_usage-action-value">90</span>%
+                    </label>
+                    <input type="range" id="disk_usage-action" min="70" max="95" value="90"
+                           oninput="updateThreshold('disk_usage', 'action', this.value)">
+                </div>
+                <div class="response-select">
+                    <label>Response Action:</label>
+                    <select id="disk_usage-response" onchange="updateResponseAction('disk_usage', this.value)">
+                        <option value="none">None</option>
+                        <option value="stop_kismet">Stop Kismet</option>
+                        <option value="stop_and_shutdown" selected>Stop + Shutdown</option>
+                        <option value="custom">Custom Command</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Memory Usage Thresholds -->
+            <div class="threshold-metric">
+                <h4>MEMORY USAGE (%)</h4>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Warning:</span>
+                        <span id="memory_usage-warning-value">80</span>%
+                    </label>
+                    <input type="range" id="memory_usage-warning" min="70" max="95" value="80"
+                           oninput="updateThreshold('memory_usage', 'warning', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Critical:</span>
+                        <span id="memory_usage-critical-value">85</span>%
+                    </label>
+                    <input type="range" id="memory_usage-critical" min="70" max="95" value="85"
+                           oninput="updateThreshold('memory_usage', 'critical', this.value)">
+                </div>
+                <div class="threshold-slider">
+                    <label>
+                        <span>Action:</span>
+                        <span id="memory_usage-action-value">90</span>%
+                    </label>
+                    <input type="range" id="memory_usage-action" min="70" max="95" value="90"
+                           oninput="updateThreshold('memory_usage', 'action', this.value)">
+                </div>
+                <div class="response-select">
+                    <label>Response Action:</label>
+                    <select id="memory_usage-response" onchange="updateResponseAction('memory_usage', this.value)">
+                        <option value="none" selected>None</option>
+                        <option value="stop_kismet">Stop Kismet</option>
+                        <option value="stop_and_shutdown">Stop + Shutdown</option>
+                        <option value="custom">Custom Command</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="threshold-actions">
+                <button class="btn-primary" onclick="saveThresholdConfig()">SAVE THRESHOLDS</button>
+            </div>
+        </div>
+    </div>
 </div>

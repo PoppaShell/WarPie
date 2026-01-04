@@ -695,3 +695,145 @@ function closePerformance() {
 function isPerformanceFlyoutOpen() {
     return document.getElementById('performance-flyout').classList.contains('open');
 }
+
+// === Threshold Configuration ===
+
+let currentConfig = null;
+
+async function loadThresholdConfig() {
+    try {
+        const response = await fetch('/api/performance/config');
+        if (!response.ok) {
+            console.error('Failed to load threshold config');
+            return;
+        }
+        currentConfig = await response.json();
+        updateThresholdUI();
+    } catch (error) {
+        console.error('Error loading threshold config:', error);
+    }
+}
+
+function updateThresholdUI() {
+    if (!currentConfig) return;
+
+    // Update all sliders and dropdowns with current config
+    for (const [metric, settings] of Object.entries(currentConfig)) {
+        if (metric === 'global_settings') continue;
+
+        const warningSlider = document.getElementById(`${metric}-warning`);
+        const criticalSlider = document.getElementById(`${metric}-critical`);
+        const actionSlider = document.getElementById(`${metric}-action`);
+        const responseSelect = document.getElementById(`${metric}-response`);
+
+        if (warningSlider) {
+            warningSlider.value = settings.warning_threshold;
+            document.getElementById(`${metric}-warning-value`).textContent = settings.warning_threshold;
+        }
+        if (criticalSlider) {
+            criticalSlider.value = settings.critical_threshold;
+            document.getElementById(`${metric}-critical-value`).textContent = settings.critical_threshold;
+        }
+        if (actionSlider) {
+            actionSlider.value = settings.action_threshold;
+            document.getElementById(`${metric}-action-value`).textContent = settings.action_threshold;
+        }
+        if (responseSelect) {
+            responseSelect.value = settings.response_action;
+        }
+    }
+}
+
+async function saveThresholdConfig() {
+    if (!currentConfig) {
+        showToast('No configuration to save', true);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/performance/config', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(currentConfig)
+        });
+
+        if (response.ok) {
+            showToast('Thresholds saved successfully');
+        } else {
+            const error = await response.json();
+            showToast(`Failed to save: ${error.error}`, true);
+        }
+    } catch (error) {
+        showToast('Failed to save thresholds', true);
+        console.error('Error saving config:', error);
+    }
+}
+
+function updateThreshold(metric, level, value) {
+    if (!currentConfig || !currentConfig[metric]) return;
+
+    const thresholdKey = `${level}_threshold`;
+    currentConfig[metric][thresholdKey] = parseFloat(value);
+
+    // Update display value
+    const displayElement = document.getElementById(`${metric}-${level}-value`);
+    if (displayElement) {
+        displayElement.textContent = value;
+    }
+}
+
+function updateResponseAction(metric, action) {
+    if (!currentConfig || !currentConfig[metric]) return;
+    currentConfig[metric].response_action = action;
+}
+
+function dismissAlert(metric) {
+    fetch('/api/performance/dismiss', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({metric: metric})
+    }).catch(error => {
+        console.error('Error dismissing alert:', error);
+    });
+
+    // Remove alert banner immediately
+    const alertBanner = document.getElementById('perf-alert-banner');
+    if (alertBanner) {
+        alertBanner.innerHTML = '';
+    }
+}
+
+function toggleSettings() {
+    const content = document.getElementById('threshold-settings');
+    const button = event.target;
+
+    if (!content || !button) return;
+
+    if (content.classList.contains('hidden')) {
+        content.classList.remove('hidden');
+        button.textContent = 'CONFIGURE THRESHOLDS [-]';
+        if (!currentConfig) {
+            loadThresholdConfig();  // Load on first open
+        }
+    } else {
+        content.classList.add('hidden');
+        button.textContent = 'CONFIGURE THRESHOLDS [+]';
+    }
+}
+
+// Load config when flyout opens
+document.addEventListener('DOMContentLoaded', () => {
+    const perfFlyout = document.getElementById('performance-flyout');
+    if (perfFlyout) {
+        const observer = new MutationObserver((mutations) => {
+            for (const mutation of mutations) {
+                if (mutation.attributeName === 'class') {
+                    if (perfFlyout.classList.contains('open') && !currentConfig) {
+                        loadThresholdConfig();
+                    }
+                }
+            }
+        });
+        observer.observe(perfFlyout, {attributes: true, attributeFilter: ['class']});
+    }
+});
