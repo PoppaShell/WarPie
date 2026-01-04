@@ -679,3 +679,19 @@ document.body.addEventListener('htmx:afterRequest', function(evt) {
         }
     }
 });
+
+// === Performance Flyout ===
+
+function openPerformance() {
+    document.getElementById('flyout-overlay').classList.add('open');
+    document.getElementById('performance-flyout').classList.add('open');
+}
+
+function closePerformance() {
+    document.getElementById('flyout-overlay').classList.remove('open');
+    document.getElementById('performance-flyout').classList.remove('open');
+}
+
+function isPerformanceFlyoutOpen() {
+    return document.getElementById('performance-flyout').classList.contains('open');
+}

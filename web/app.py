@@ -7,7 +7,7 @@ on Raspberry Pi with cyberpunk aesthetic and HTMX for dynamic updates.
 
 from flask import Flask
 
-from web.routes import filters_bp, logs_bp, main_bp, targets_bp
+from web.routes import filters_bp, logs_bp, main_bp, performance_bp, targets_bp
 
 
 def create_app() -> Flask:
@@ -27,5 +27,6 @@ def create_app() -> Flask:
     app.register_blueprint(filters_bp, url_prefix="/api")
     app.register_blueprint(targets_bp, url_prefix="/api")
     app.register_blueprint(logs_bp, url_prefix="/api")
+    app.register_blueprint(performance_bp, url_prefix="/api")
 
     return app

@@ -1,0 +1,19 @@
+<div class="flyout-header">
+    <h2>[PERFORMANCE]</h2>
+    <button class="flyout-close" onclick="closePerformance()">[X]</button>
+</div>
+
+<div class="flyout-content">
+    <!-- Section 1: Metrics Display -->
+    <div class="perf-section">
+        <h3>SYSTEM METRICS</h3>
+        <div id="perf-metrics"
+             hx-get="/api/performance/html"
+             hx-trigger="load, every 5s[isPerformanceFlyoutOpen()]"
+             hx-swap="innerHTML">
+            <div class="loading"><span class="spinner"></span> Loading...</div>
+        </div>
+    </div>
+
+    <!-- Phase 2/3 sections will be added later -->
+</div>

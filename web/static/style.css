@@ -1169,3 +1169,80 @@ select option {
 .mono {
     font-family: 'Courier New', Courier, monospace;
 }
+
+/* ============================================
+   PERFORMANCE MONITORING STYLES
+   ============================================ */
+
+/* Performance Flyout Sections */
+.perf-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid var(--border);
+}
+
+.perf-section:last-child {
+    border-bottom: none;
+}
+
+.perf-section h3 {
+    font-size: calc(12px * var(--font-scale));
+    color: var(--fg-bright);
+    margin-bottom: 10px;
+    letter-spacing: 1px;
+}
+
+/* Metric Row with Progress Bar */
+.metric-row {
+    margin-bottom: 12px;
+}
+
+.metric-label {
+    display: block;
+    font-size: calc(11px * var(--font-scale));
+    color: var(--fg-dim);
+    margin-bottom: 4px;
+}
+
+.metric-value {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.progress-bar {
+    flex: 1;
+    height: 20px;
+    background: rgba(0, 50, 0, 0.3);
+    border: 1px solid var(--border);
+    position: relative;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.progress-fill.ok {
+    background: var(--fg);
+    box-shadow: 0 0 5px var(--fg);
+}
+
+.progress-fill.warning {
+    background: var(--warning);
+    box-shadow: 0 0 5px var(--warning);
+}
+
+.progress-fill.critical {
+    background: var(--error);
+    box-shadow: 0 0 5px var(--error);
+}
+
+.metric-number {
+    font-size: calc(14px * var(--font-scale));
+    color: var(--fg-bright);
+    font-weight: bold;
+    min-width: 80px;
+    text-align: right;
+}
