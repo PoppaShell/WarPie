@@ -801,7 +801,7 @@ def api_config_post():
         else:
             return jsonify({"success": False, "error": "Failed to save config"}), 500
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error saving performance config")
         return jsonify({"success": False, "error": "Internal server error"}), 500
 
@@ -876,6 +876,6 @@ def api_test_action():
 
         return jsonify({"success": success})
 
-    except Exception as e:
+    except Exception:
         logger.exception("Error testing performance action")
         return jsonify({"success": False, "error": "Internal server error"}), 500
