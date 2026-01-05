@@ -722,3 +722,149 @@ class TestPerformanceRoutes:
         assert b"{" not in response.data[:10]
         # Should contain metric data
         assert b"70.0" in response.data or b"62" in response.data
+
+    @patch("web.routes.performance.get_cpu_temperature")
+    @patch("web.routes.performance.get_disk_usage")
+    @patch("web.routes.performance.get_memory_usage")
+    @patch("web.routes.performance.load_threshold_config")
+    def test_api_alerts(self, mock_config, mock_memory, mock_disk, mock_temp, client):
+        """Alerts endpoint returns JSON with active alerts."""
+        mock_temp.return_value = 85.0  # Critical temp
+        mock_disk.return_value = {"used_percent": 50}
+        mock_memory.return_value = {"used_percent": 50}
+        mock_config.return_value = {
+            "cpu_temp": {
+                "enabled": True,
+                "warning_threshold": 75,
+                "critical_threshold": 80,
+                "action_threshold": 85,
+            },
+            "disk_usage": {
+                "enabled": True,
+                "warning_threshold": 80,
+                "critical_threshold": 90,
+                "action_threshold": 95,
+            },
+            "memory_usage": {
+                "enabled": True,
+                "warning_threshold": 80,
+                "critical_threshold": 90,
+                "action_threshold": 95,
+            },
+            "global_settings": {"auto_actions_enabled": False},
+        }
+
+        response = client.get("/api/performance/alerts")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "alerts" in data
+        assert isinstance(data["alerts"], list)
+
+    @patch("web.routes.performance.get_cpu_temperature")
+    @patch("web.routes.performance.get_disk_usage")
+    @patch("web.routes.performance.get_memory_usage")
+    @patch("web.routes.performance.load_threshold_config")
+    def test_api_alerts_html(self, mock_config, mock_memory, mock_disk, mock_temp, client):
+        """Alerts HTML endpoint returns HTML fragment."""
+        mock_temp.return_value = 85.0
+        mock_disk.return_value = {"used_percent": 50}
+        mock_memory.return_value = {"used_percent": 50}
+        mock_config.return_value = {
+            "cpu_temp": {
+                "enabled": True,
+                "warning_threshold": 75,
+                "critical_threshold": 80,
+                "action_threshold": 85,
+            },
+            "disk_usage": {
+                "enabled": True,
+                "warning_threshold": 80,
+                "critical_threshold": 90,
+                "action_threshold": 95,
+            },
+            "memory_usage": {
+                "enabled": True,
+                "warning_threshold": 80,
+                "critical_threshold": 90,
+                "action_threshold": 95,
+            },
+        }
+
+        response = client.get("/api/performance/alerts/html")
+        assert response.status_code == 200
+        assert b"<" in response.data  # HTML content
+
+    def test_api_config_get(self, client):
+        """Config GET endpoint returns current configuration."""
+        response = client.get("/api/performance/config")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "cpu_temp" in data
+        assert "disk_usage" in data
+        assert "memory_usage" in data
+
+    @patch("web.routes.performance.save_threshold_config")
+    def test_api_config_post_success(self, mock_save, client):
+        """Config POST endpoint saves configuration."""
+        mock_save.return_value = True
+
+        config = {
+            "cpu_temp": {"enabled": True, "warning_threshold": 75},
+            "disk_usage": {"enabled": True, "warning_threshold": 80},
+            "memory_usage": {"enabled": True, "warning_threshold": 80},
+            "global_settings": {"auto_actions_enabled": True},
+        }
+
+        response = client.post(
+            "/api/performance/config", json=config, content_type="application/json"
+        )
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data["success"] is True
+
+    def test_api_config_post_no_data(self, client):
+        """Config POST with no data returns error."""
+        response = client.post("/api/performance/config", json={})
+        # Empty dict will fail validation for missing keys
+        assert response.status_code in [400, 500]
+        data = response.get_json()
+        assert data["success"] is False
+
+    def test_api_config_post_missing_keys(self, client):
+        """Config POST with missing keys returns error."""
+        incomplete_config = {"cpu_temp": {"enabled": True}}
+
+        response = client.post(
+            "/api/performance/config",
+            json=incomplete_config,
+            content_type="application/json",
+        )
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data["success"] is False
+        assert "Missing required" in data["error"]
+
+    def test_api_history_empty(self, client):
+        """History endpoint returns empty list when no log file."""
+        response = client.get("/api/performance/history")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert "history" in data
+        assert isinstance(data["history"], list)
+
+    @patch("pathlib.Path.exists")
+    @patch("pathlib.Path.open")
+    def test_api_history_with_entries(self, mock_open, mock_exists, client):
+        """History endpoint returns parsed log entries."""
+        mock_exists.return_value = True
+        mock_open.return_value.__enter__.return_value.readlines.return_value = [
+            "2026-01-05 10:00:00 | cpu_temp | 85.0 | critical | stop_kismet | SUCCESS\n",
+            "2026-01-05 10:05:00 | disk_usage | 95 | action | custom | FAILED\n",
+        ]
+
+        response = client.get("/api/performance/history")
+        assert response.status_code == 200
+        data = response.get_json()
+        assert len(data["history"]) == 2
+        assert data["history"][0]["metric"] == "cpu_temp"
+        assert data["history"][1]["status"] == "FAILED"
