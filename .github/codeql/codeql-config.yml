@@ -4,13 +4,3 @@ name: "CodeQL Configuration"
 paths-ignore:
   - "tests/**"
   - "**/*.md"
-
-# Query filters - suppress specific alerts
-query-filters:
-  # Suppress command injection alert for validated custom commands
-  # This is intentional functionality for admin-defined response actions
-  # Commands are validated against DANGEROUS_PATTERNS blocklist
-  - exclude:
-      id: py/command-line-injection
-      paths:
-        - web/routes/performance.py
