@@ -57,6 +57,10 @@
                         <option value="stop_and_shutdown">Stop + Shutdown</option>
                         <option value="custom">Custom Command</option>
                     </select>
+                    <input type="text" id="cpu_temp-custom-cmd" class="custom-cmd-input"
+                           placeholder="Enter custom command..."
+                           style="display:none; margin-top: 10px; width: 100%; padding: 5px;"
+                           oninput="updateCustomCommand('cpu_temp', this.value)">
                 </div>
             </div>
 
@@ -95,6 +99,10 @@
                         <option value="stop_and_shutdown" selected>Stop + Shutdown</option>
                         <option value="custom">Custom Command</option>
                     </select>
+                    <input type="text" id="disk_usage-custom-cmd" class="custom-cmd-input"
+                           placeholder="Enter custom command..."
+                           style="display:none; margin-top: 10px; width: 100%; padding: 5px;"
+                           oninput="updateCustomCommand('disk_usage', this.value)">
                 </div>
             </div>
 
@@ -133,6 +141,10 @@
                         <option value="stop_and_shutdown">Stop + Shutdown</option>
                         <option value="custom">Custom Command</option>
                     </select>
+                    <input type="text" id="memory_usage-custom-cmd" class="custom-cmd-input"
+                           placeholder="Enter custom command..."
+                           style="display:none; margin-top: 10px; width: 100%; padding: 5px;"
+                           oninput="updateCustomCommand('memory_usage', this.value)">
                 </div>
             </div>
 

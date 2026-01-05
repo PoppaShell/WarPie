@@ -725,6 +725,7 @@ function updateThresholdUI() {
         const criticalSlider = document.getElementById(`${metric}-critical`);
         const actionSlider = document.getElementById(`${metric}-action`);
         const responseSelect = document.getElementById(`${metric}-response`);
+        const customInput = document.getElementById(`${metric}-custom-cmd`);
 
         if (warningSlider) {
             warningSlider.value = settings.warning_threshold;
@@ -740,6 +741,12 @@ function updateThresholdUI() {
         }
         if (responseSelect) {
             responseSelect.value = settings.response_action;
+        }
+
+        // Load custom command and show/hide input based on response action
+        if (customInput) {
+            customInput.value = settings.custom_command || '';
+            customInput.style.display = (settings.response_action === 'custom') ? 'block' : 'none';
         }
     }
 }
@@ -785,6 +792,17 @@ function updateThreshold(metric, level, value) {
 function updateResponseAction(metric, action) {
     if (!currentConfig || !currentConfig[metric]) return;
     currentConfig[metric].response_action = action;
+
+    // Show/hide custom command input based on selection
+    const customInput = document.getElementById(`${metric}-custom-cmd`);
+    if (customInput) {
+        customInput.style.display = (action === 'custom') ? 'block' : 'none';
+    }
+}
+
+function updateCustomCommand(metric, command) {
+    if (!currentConfig || !currentConfig[metric]) return;
+    currentConfig[metric].custom_command = command;
 }
 
 function dismissAlert(metric) {
