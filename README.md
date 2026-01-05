@@ -8,6 +8,7 @@ A complete wardriving and wireless research platform for Raspberry Pi OS, featur
 - **GPS Integration**: Location-tagged network logging for mapping and analysis
 - **Automatic Network Switching**: Seamlessly switches between home WiFi and mobile access point
 - **Web Control Panel**: Flask-based mobile interface with cyberpunk terminal theme (port 1337)
+- **Performance Monitoring**: Real-time system metrics with multi-tier threshold alerts and automatic response actions
 - **Network Filtering**: Static exclusions (MAC-based) and dynamic exclusions (pattern-based with wildcards)
 - **Multiple Capture Modes**:
   - **Normal**: Full device capture with exclusions applied
@@ -38,7 +39,7 @@ A complete wardriving and wireless research platform for Raspberry Pi OS, featur
 
 ```bash
 # Download and extract latest release
-VERSION=2.4.1
+VERSION=2.5.0
 curl -L "https://github.com/PoppaShell/WarPie/releases/download/v${VERSION}/warpie-${VERSION}.tar.gz" | tar xz
 cd warpie-${VERSION}
 sudo ./install/install.sh

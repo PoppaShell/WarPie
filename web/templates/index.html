@@ -7,6 +7,13 @@
     <h1>WARPIE CONTROLLER</h1>
 </header>
 
+<!-- Performance Alert Banner -->
+<div id="perf-alert-banner"
+     hx-get="/api/performance/alerts/html"
+     hx-trigger="load, every 10s"
+     hx-swap="innerHTML">
+</div>
+
 <!-- Status Panel -->
 <div class="terminal-box" id="status-panel"
      hx-get="/api/status/html"
@@ -44,6 +51,7 @@
 <nav class="nav-row">
     <button class="nav-btn" onclick="openFilters()">FILTERS</button>
     <button class="nav-btn" onclick="openLogs()">LOGS</button>
+    <button class="nav-btn" onclick="openPerformance()">PERFORMANCE</button>
     <a href="http://{{ request.host.split(':')[0] }}:2501" target="_blank" class="nav-btn">KISMET</a>
 </nav>
 
@@ -66,6 +74,11 @@
 <!-- Network Filters Flyout -->
 <div class="flyout" id="filters-flyout">
     {% include "partials/_flyout_filters.html" %}
+</div>
+
+<!-- Performance Flyout -->
+<div class="flyout" id="performance-flyout">
+    {% include "partials/_flyout_performance.html" %}
 </div>
 
 <!-- Target List Editor Flyout -->

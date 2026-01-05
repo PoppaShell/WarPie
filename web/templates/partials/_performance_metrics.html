@@ -1,0 +1,81 @@
+<!-- CPU Temperature -->
+<div class="metric-row">
+    <span class="metric-label">CPU TEMP</span>
+    <div class="metric-value">
+        <div class="progress-bar">
+            <div class="progress-fill {% if cpu_temp > 80 %}critical{% elif cpu_temp > 75 %}warning{% else %}ok{% endif %}"
+                 style="width: {{ (cpu_temp / 100 * 100)|int }}%"></div>
+        </div>
+        <span class="metric-number">{{ "%.1f"|format(cpu_temp) }}°C</span>
+    </div>
+</div>
+
+<!-- Disk Usage -->
+<div class="metric-row">
+    <span class="metric-label">DISK USAGE</span>
+    <div class="metric-value">
+        <div class="progress-bar">
+            <div class="progress-fill {% if disk.used_percent > 85 %}critical{% elif disk.used_percent > 80 %}warning{% else %}ok{% endif %}"
+                 style="width: {{ disk.used_percent }}%"></div>
+        </div>
+        <span class="metric-number">{{ disk.used_gb }}GB / {{ disk.total_gb }}GB ({{ disk.used_percent }}%)</span>
+    </div>
+</div>
+
+<!-- Memory Usage -->
+<div class="metric-row">
+    <span class="metric-label">MEMORY</span>
+    <div class="metric-value">
+        <div class="progress-bar">
+            <div class="progress-fill {% if memory.used_percent > 85 %}critical{% elif memory.used_percent > 80 %}warning{% else %}ok{% endif %}"
+                 style="width: {{ memory.used_percent|int }}%"></div>
+        </div>
+        <span class="metric-number">{{ "%.0f"|format(memory.used_mb) }}MB / {{ "%.0f"|format(memory.total_mb) }}MB ({{ "%.0f"|format(memory.used_percent) }}%)</span>
+    </div>
+</div>
+
+<!-- CPU Load Average -->
+<div class="metric-row">
+    <span class="metric-label">CPU LOAD (1/5/15 min)</span>
+    <div class="metric-value">
+        <span class="metric-number">{{ "%.2f"|format(cpu_load[0]) }} / {{ "%.2f"|format(cpu_load[1]) }} / {{ "%.2f"|format(cpu_load[2]) }}</span>
+    </div>
+</div>
+
+<!-- GPS Status -->
+<div class="metric-row">
+    <span class="metric-label">GPS STATUS</span>
+    <div class="metric-value">
+        <span class="metric-number {% if gps.status == '3D_FIX' %}ok{% elif gps.status == '2D_FIX' %}warning{% else %}critical{% endif %}">
+            {{ gps.status }} ({{ gps.satellites }} sats)
+        </span>
+    </div>
+</div>
+
+<!-- WiFi Adapter wlan1 -->
+<div class="metric-row">
+    <span class="metric-label">ADAPTER WLAN1</span>
+    <div class="metric-value">
+        <span class="metric-number {% if adapter_wlan1 == 'UP' %}ok{% else %}critical{% endif %}">
+            {{ adapter_wlan1 }}
+        </span>
+    </div>
+</div>
+
+<!-- WiFi Adapter wlan2 -->
+<div class="metric-row">
+    <span class="metric-label">ADAPTER WLAN2</span>
+    <div class="metric-value">
+        <span class="metric-number {% if adapter_wlan2 == 'UP' %}ok{% else %}critical{% endif %}">
+            {{ adapter_wlan2 }}
+        </span>
+    </div>
+</div>
+
+<!-- Capture Rate -->
+<div class="metric-row">
+    <span class="metric-label">CAPTURE RATE</span>
+    <div class="metric-value">
+        <span class="metric-number">{{ "%.1f"|format(capture_rate) }} pps</span>
+    </div>
+</div>

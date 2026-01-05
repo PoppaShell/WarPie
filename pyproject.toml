@@ -25,6 +25,7 @@ classifiers = [
 dependencies = [
     "flask>=3.0",
     "waitress>=3.0",
+    "psutil>=6.0",
 ]
 
 [project.urls]

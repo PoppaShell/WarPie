@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.5.0] - 2026-01-04
+
+### Added
+
+- Performance monitoring flyout with real-time system metrics
+- Multi-tier threshold system (warning/critical/action) for CPU temp, disk usage, and memory usage
+- Configurable automatic response actions (stop Kismet, shutdown, custom commands)
+- GPS status monitoring with satellite count and fix quality
+- WiFi adapter health monitoring (wlan1/wlan2 status)
+- Capture rate monitoring via Kismet REST API
+- Alert banner on main dashboard with auto-refresh and dismiss functionality
+- Threshold configuration UI with sliders and response action dropdowns
+- Action execution with dangerous command pattern blocking and cooldown mechanism
+- Atomic configuration persistence to `/etc/warpie/performance_thresholds.conf`
+- Action history logging to `/var/log/warpie/performance_actions.log`
+- 48 comprehensive tests with 72% coverage on performance monitoring module
+
 ## [2.4.1] - 2025-12-25
 
 ### Added

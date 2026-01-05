@@ -1,0 +1,6 @@
+name: "CodeQL Configuration"
+
+# Paths to ignore during analysis
+paths-ignore:
+  - "tests/**"
+  - "**/*.md"
