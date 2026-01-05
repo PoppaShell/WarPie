@@ -128,7 +128,7 @@ class TestDiskUsage:
         """Returns zeros when df times out."""
         from web.routes.performance import get_disk_usage
 
-        mock_run.side_effect = subprocess.TimeoutExpired("df", 5)  # noqa: F821
+        mock_run.side_effect = subprocess.TimeoutExpired("df", 5)
 
         result = get_disk_usage()
         assert result["total_gb"] == 0
@@ -142,7 +142,7 @@ class TestMemoryUsage:
         """Returns memory usage statistics."""
         from web.routes.performance import get_memory_usage
 
-        # Simulate /proc/meminfo (values in kB)
+        # Mock /proc/meminfo content with values in kB
         mock_read.return_value = (
             "MemTotal:        4000000 kB\n"
             "MemFree:         1500000 kB\n"
@@ -167,9 +167,7 @@ class TestMemoryUsage:
         from web.routes.performance import get_memory_usage
 
         # 90% usage scenario
-        mock_read.return_value = (
-            "MemTotal:        4000000 kB\n" "MemAvailable:     400000 kB\n"
-        )
+        mock_read.return_value = "MemTotal:        4000000 kB\nMemAvailable:     400000 kB\n"
 
         result = get_memory_usage()
         assert result["used_percent"] > 89
@@ -281,9 +279,7 @@ class TestGPSStatus:
         """Returns NO_FIX when GPS has no fix."""
         from web.routes.performance import get_gps_status
 
-        mock_run.return_value = MagicMock(
-            returncode=0, stdout='{"class":"TPV","mode":0}\n'
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout='{"class":"TPV","mode":0}\n')
 
         result = get_gps_status()
         assert result["status"] == "NO_FIX"
@@ -371,10 +367,7 @@ class TestCaptureRate:
         mock_count.return_value = 2
 
         # Simulate journal output with 10 detections in 10 seconds
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="Detected new\n" * 10
-        )
+        mock_run.return_value = MagicMock(returncode=0, stdout="Detected new\n" * 10)
 
         result = get_capture_rate()
         assert result == 1.0  # 10 detections / 10 seconds
@@ -602,8 +595,8 @@ class TestConfigManagement:
         config = load_threshold_config()
         assert config == DEFAULT_CONFIG
 
-    @patch("os.path.exists")
-    @patch("builtins.open", create=True)
+    @patch("pathlib.Path.exists")
+    @patch("pathlib.Path.open")
     def test_load_custom_config(self, mock_open, mock_exists):
         """Loads custom config from file."""
         from web.routes.performance import load_threshold_config
@@ -613,14 +606,14 @@ class TestConfigManagement:
             '{"cpu_temp": {"enabled": true, "warning_threshold": 70}}'
         )
 
-        config = load_threshold_config()
+        load_threshold_config()
         # Should have loaded custom config (mocking makes this tricky, just verify it tries)
         mock_exists.assert_called_once()
 
-    @patch("os.makedirs")
-    @patch("builtins.open", create=True)
-    @patch("os.replace")
-    def test_save_config_atomic(self, mock_replace, mock_open, mock_makedirs):
+    @patch("pathlib.Path.mkdir")
+    @patch("pathlib.Path.open")
+    @patch("pathlib.Path.replace")
+    def test_save_config_atomic(self, mock_replace, mock_open, mock_mkdir):
         """Saves config atomically."""
         from web.routes.performance import DEFAULT_CONFIG, save_threshold_config
 

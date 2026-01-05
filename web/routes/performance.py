@@ -5,7 +5,6 @@ response actions for the WarPie Raspberry Pi wardriving platform.
 """
 
 import json
-import os
 import re
 import subprocess
 import time
@@ -126,7 +125,7 @@ def get_disk_usage() -> dict:
                         "avail_gb": avail_gb,
                         "used_percent": used_percent,
                     }
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return {
@@ -171,7 +170,7 @@ def get_memory_usage() -> dict:
                 "used_mb": round(used_mb, 1),
                 "used_percent": round(used_percent, 1),
             }
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return {
@@ -201,7 +200,7 @@ def get_cpu_load() -> list[float]:
                 round(float(parts[1]), 2),
                 round(float(parts[2]), 2),
             ]
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return [0.0, 0.0, 0.0]
@@ -262,8 +261,6 @@ def get_gps_status() -> dict:
         if result.returncode == 0:
             # Parse JSON output from gpspipe
             # Look for TPV class messages with mode field
-            import json
-
             satellites = 0
             mode = 0  # 0=no fix, 2=2D, 3=3D
 
@@ -291,7 +288,7 @@ def get_gps_status() -> dict:
                 "satellites": satellites,
                 "fix_quality": status,
             }
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return {
@@ -301,7 +298,7 @@ def get_gps_status() -> dict:
     }
 
 
-def get_adapter_status(interface: str) -> str:
+def get_adapter_status(interface: str) -> str:  # noqa: ARG001
     """Get WiFi adapter status by checking Kismet capture processes.
 
     Checks if Kismet has active capture processes running for the adapters.
@@ -377,10 +374,11 @@ def load_threshold_config() -> dict:
         Threshold config dict, or defaults if file doesn't exist or is corrupted.
     """
     try:
-        if os.path.exists(PERFORMANCE_CONFIG):
-            with open(PERFORMANCE_CONFIG) as f:
+        config_path = Path(PERFORMANCE_CONFIG)
+        if config_path.exists():
+            with config_path.open() as f:
                 return json.load(f)
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
     return DEFAULT_CONFIG.copy()
@@ -397,15 +395,16 @@ def save_threshold_config(config: dict) -> bool:
     """
     try:
         # Ensure directory exists
-        os.makedirs(os.path.dirname(PERFORMANCE_CONFIG), exist_ok=True)
+        config_path = Path(PERFORMANCE_CONFIG)
+        config_path.parent.mkdir(parents=True, exist_ok=True)
 
         # Atomic write using temp file
-        temp_path = PERFORMANCE_CONFIG + ".tmp"
-        with open(temp_path, "w") as f:
+        temp_path = Path(PERFORMANCE_CONFIG + ".tmp")
+        with temp_path.open("w") as f:
             json.dump(config, f, indent=2)
 
         # Atomic replace
-        os.replace(temp_path, PERFORMANCE_CONFIG)
+        temp_path.replace(config_path)
         return True
     except Exception:
         return False
@@ -543,10 +542,7 @@ def validate_custom_command(cmd: str) -> bool:
     Returns:
         True if safe, False if dangerous
     """
-    for pattern in DANGEROUS_PATTERNS:
-        if re.search(pattern, cmd, re.IGNORECASE):
-            return False
-    return True
+    return all(not re.search(pattern, cmd, re.IGNORECASE) for pattern in DANGEROUS_PATTERNS)
 
 
 def can_execute_action(metric: str, cooldown: int) -> bool:
@@ -577,15 +573,16 @@ def log_action(metric: str, value: float, level: str, action: str, success: bool
         success: Whether action succeeded
     """
     try:
-        os.makedirs(os.path.dirname(PERFORMANCE_LOG), exist_ok=True)
+        log_path = Path(PERFORMANCE_LOG)
+        log_path.parent.mkdir(parents=True, exist_ok=True)
 
         timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
         status = "SUCCESS" if success else "FAILED"
         log_entry = f"{timestamp} | {metric} | {value} | {level} | {action} | {status}\n"
 
-        with open(PERFORMANCE_LOG, "a") as f:
+        with log_path.open("a") as f:
             f.write(log_entry)
-    except Exception:
+    except Exception:  # noqa: S110
         pass
 
 
@@ -633,7 +630,7 @@ def execute_action(metric: str, action: str, custom_cmd: str | None, value: floa
                 log_action(metric, value, "action", f"custom:{custom_cmd}", False)
                 return False
 
-            result = subprocess.run(
+            result = subprocess.run(  # noqa: S602
                 custom_cmd,
                 shell=True,
                 check=False,
@@ -822,10 +819,11 @@ def api_history():
         JSON with recent action history
     """
     try:
-        if not os.path.exists(PERFORMANCE_LOG):
+        log_path = Path(PERFORMANCE_LOG)
+        if not log_path.exists():
             return jsonify({"history": []})
 
-        with open(PERFORMANCE_LOG) as f:
+        with log_path.open() as f:
             lines = f.readlines()[-50:]  # Last 50 entries
 
         history = []
