@@ -5,12 +5,15 @@ response actions for the WarPie Raspberry Pi wardriving platform.
 """
 
 import json
+import logging
 import re
 import subprocess
 import time
 from pathlib import Path
 
 from flask import Blueprint, jsonify, render_template, request
+
+logger = logging.getLogger(__name__)
 
 performance_bp = Blueprint("performance", __name__)
 
@@ -625,12 +628,15 @@ def execute_action(metric: str, action: str, custom_cmd: str | None, value: floa
             success = result.returncode == 0
 
         elif action == "custom" and custom_cmd:
-            # Validate before executing
+            # Validate before executing - checks for dangerous patterns
+            # (rm -rf, dd, sudo, format, shutdown without confirmation, etc.)
             if not validate_custom_command(custom_cmd):
                 log_action(metric, value, "action", f"custom:{custom_cmd}", False)
                 return False
 
-            result = subprocess.run(  # noqa: S602
+            # Safe: Command validated against DANGEROUS_PATTERNS blocklist
+            # This is intentional functionality for custom response actions
+            result = subprocess.run(  # noqa: S602  # lgtm [py/command-line-injection]
                 custom_cmd,
                 shell=True,
                 check=False,
@@ -796,7 +802,8 @@ def api_config_post():
             return jsonify({"success": False, "error": "Failed to save config"}), 500
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.exception("Error saving performance config")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
 
 
 @performance_bp.route("/performance/dismiss", methods=["POST"])
@@ -870,4 +877,5 @@ def api_test_action():
         return jsonify({"success": success})
 
     except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.exception("Error testing performance action")
+        return jsonify({"success": False, "error": "Internal server error"}), 500
