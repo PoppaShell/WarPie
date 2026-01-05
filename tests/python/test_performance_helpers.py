@@ -313,58 +313,46 @@ class TestGPSStatus:
 class TestAdapterStatus:
     """Tests for get_adapter_status()."""
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_adapter_up(self, mock_api):
-        """Returns UP when adapter is active in Kismet."""
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_adapter_up(self, mock_count):
+        """Returns UP when 2+ capture processes are running."""
         from web.routes.performance import get_adapter_status
 
-        # Simulate Kismet datasources response with wlan1 running
-        mock_api.return_value = [
-            {
-                "kismet.datasource.name": "wlan1",
-                "kismet.datasource.interface": "wlan1",
-                "kismet.datasource.running": True,
-            }
-        ]
+        # Simulate 2 capture processes running (both adapters active)
+        mock_count.return_value = 2
 
         result = get_adapter_status("wlan1")
         assert result == "UP"
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_adapter_down(self, mock_api):
-        """Returns DOWN when adapter is not running in Kismet."""
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_adapter_down(self, mock_count):
+        """Returns DOWN when only 1 or no capture processes running."""
         from web.routes.performance import get_adapter_status
 
-        # Simulate Kismet datasources response with wlan1 not running
-        mock_api.return_value = [
-            {
-                "kismet.datasource.name": "wlan1",
-                "kismet.datasource.interface": "wlan1",
-                "kismet.datasource.running": False,
-            }
-        ]
+        # Simulate only 1 capture process
+        mock_count.return_value = 1
 
         result = get_adapter_status("wlan1")
         assert result == "DOWN"
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_adapter_not_found(self, mock_api):
-        """Returns NOT_FOUND when Kismet API is unreachable."""
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_adapter_not_found(self, mock_count):
+        """Returns DOWN when no capture processes running."""
         from web.routes.performance import get_adapter_status
 
-        # Simulate Kismet API failure
-        mock_api.return_value = {}
+        # Simulate no capture processes
+        mock_count.return_value = 0
 
         result = get_adapter_status("wlan999")
-        assert result == "NOT_FOUND"
+        assert result == "DOWN"
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_adapter_command_timeout(self, mock_api):
-        """Returns NOT_FOUND when API query raises exception."""
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_adapter_command_timeout(self, mock_count):
+        """Returns NOT_FOUND when process check raises exception."""
         from web.routes.performance import get_adapter_status
 
-        # Simulate timeout/exception from API
-        mock_api.side_effect = Exception("Connection timeout")
+        # Simulate exception from process check
+        mock_count.side_effect = Exception("Process check failed")
 
         result = get_adapter_status("wlan1")
         assert result == "NOT_FOUND"
@@ -373,50 +361,61 @@ class TestAdapterStatus:
 class TestCaptureRate:
     """Tests for get_capture_rate()."""
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_capture_rate_success(self, mock_api):
-        """Returns capture rate from Kismet API."""
+    @patch("subprocess.run")
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_capture_rate_success(self, mock_count, mock_run):
+        """Returns capture rate based on recent detections."""
         from web.routes.performance import get_capture_rate
 
-        # Simulate Kismet API response with packet rate
-        mock_api.return_value = {
-            "kismet.system.packets_rrd": {"kismet.common.rrd.last": 245.6}
-        }
+        # Simulate capture processes running
+        mock_count.return_value = 2
+
+        # Simulate journal output with 10 detections in 10 seconds
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout="Detected new\n" * 10
+        )
 
         result = get_capture_rate()
-        assert result == 245.6
+        assert result == 1.0  # 10 detections / 10 seconds
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_capture_rate_zero(self, mock_api):
-        """Returns 0.0 when no packets."""
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_capture_rate_zero(self, mock_count):
+        """Returns 0.0 when no capture processes."""
         from web.routes.performance import get_capture_rate
 
-        # Simulate API response with zero packet rate
-        mock_api.return_value = {
-            "kismet.system.packets_rrd": {"kismet.common.rrd.last": 0}
-        }
-
-        result = get_capture_rate()
-        assert result == 0.0
-
-    @patch("web.routes.performance.query_kismet_api")
-    def test_capture_rate_connection_error(self, mock_api):
-        """Returns 0.0 when Kismet is unreachable."""
-        from web.routes.performance import get_capture_rate
-
-        # Simulate API failure
-        mock_api.return_value = {}
+        # Simulate no capture processes
+        mock_count.return_value = 0
 
         result = get_capture_rate()
         assert result == 0.0
 
-    @patch("web.routes.performance.query_kismet_api")
-    def test_capture_rate_timeout(self, mock_api):
-        """Returns 0.0 when API query raises exception."""
+    @patch("subprocess.run")
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_capture_rate_connection_error(self, mock_count, mock_run):
+        """Returns 1.0 when processes running but journal fails."""
         from web.routes.performance import get_capture_rate
+
+        # Simulate capture processes running
+        mock_count.return_value = 2
+
+        # Simulate journal failure
+        mock_run.return_value = MagicMock(returncode=1, stdout="")
+
+        result = get_capture_rate()
+        assert result == 1.0  # Nominal rate when processes running but journal fails
+
+    @patch("subprocess.run")
+    @patch("web.routes.performance.get_kismet_capture_count")
+    def test_capture_rate_timeout(self, mock_count, mock_run):
+        """Returns 0.0 when subprocess raises exception."""
+        from web.routes.performance import get_capture_rate
+
+        # Simulate capture processes running
+        mock_count.return_value = 2
 
         # Simulate timeout exception
-        mock_api.side_effect = Exception("Request timed out")
+        mock_run.side_effect = Exception("Request timed out")
 
         result = get_capture_rate()
         assert result == 0.0
