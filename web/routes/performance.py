@@ -634,9 +634,13 @@ def execute_action(metric: str, action: str, custom_cmd: str | None, value: floa
                 log_action(metric, value, "action", f"custom:{custom_cmd}", False)
                 return False
 
-            # Safe: Command validated against DANGEROUS_PATTERNS blocklist
-            # This is intentional functionality for custom response actions
-            result = subprocess.run(  # noqa: S602  # lgtm [py/command-line-injection]
+            # codeql[py/command-line-injection] Safe: validated against DANGEROUS_PATTERNS
+            # This is intentional functionality for admin-defined custom response actions.
+            # Commands are validated by validate_custom_command() which blocks:
+            # - Destructive ops (rm -rf, dd, mkfs, format)
+            # - Privilege escalation (sudo, su)
+            # - System control (shutdown, reboot without --dry-run)
+            result = subprocess.run(  # noqa: S602
                 custom_cmd,
                 shell=True,
                 check=False,
