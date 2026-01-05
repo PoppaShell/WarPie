@@ -251,10 +251,10 @@ class TestGPSStatus:
         """Returns 3D_FIX when GPS has 3D fix."""
         from web.routes.performance import get_gps_status
 
-        # Simulate gpspipe output with 3D fix
+        # Simulate gpspipe output with 3D fix (using uSat field)
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout='{"class":"TPV","mode":3}\n{"class":"SKY","satellites":[{},{},{},{},{},{},{},{}]}\n',
+            stdout='{"class":"TPV","mode":3}\n{"class":"SKY","nSat":12,"uSat":8,"satellites":[{},{},{},{},{},{},{},{}]}\n',
         )
 
         result = get_gps_status()
@@ -269,7 +269,7 @@ class TestGPSStatus:
 
         mock_run.return_value = MagicMock(
             returncode=0,
-            stdout='{"class":"TPV","mode":2}\n{"class":"SKY","satellites":[{},{},{},{}]}\n',
+            stdout='{"class":"TPV","mode":2}\n{"class":"SKY","nSat":6,"uSat":4,"satellites":[{},{},{},{}]}\n',
         )
 
         result = get_gps_status()
@@ -313,48 +313,58 @@ class TestGPSStatus:
 class TestAdapterStatus:
     """Tests for get_adapter_status()."""
 
-    @patch("subprocess.run")
-    def test_adapter_up(self, mock_run):
-        """Returns UP when adapter is up."""
+    @patch("web.routes.performance.query_kismet_api")
+    def test_adapter_up(self, mock_api):
+        """Returns UP when adapter is active in Kismet."""
         from web.routes.performance import get_adapter_status
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="2: wlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500\n",
-        )
+        # Simulate Kismet datasources response with wlan1 running
+        mock_api.return_value = [
+            {
+                "kismet.datasource.name": "wlan1",
+                "kismet.datasource.interface": "wlan1",
+                "kismet.datasource.running": True,
+            }
+        ]
 
         result = get_adapter_status("wlan1")
         assert result == "UP"
 
-    @patch("subprocess.run")
-    def test_adapter_down(self, mock_run):
-        """Returns DOWN when adapter is down."""
+    @patch("web.routes.performance.query_kismet_api")
+    def test_adapter_down(self, mock_api):
+        """Returns DOWN when adapter is not running in Kismet."""
         from web.routes.performance import get_adapter_status
 
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout="2: wlan1: <BROADCAST,MULTICAST> mtu 1500\n",
-        )
+        # Simulate Kismet datasources response with wlan1 not running
+        mock_api.return_value = [
+            {
+                "kismet.datasource.name": "wlan1",
+                "kismet.datasource.interface": "wlan1",
+                "kismet.datasource.running": False,
+            }
+        ]
 
         result = get_adapter_status("wlan1")
         assert result == "DOWN"
 
-    @patch("subprocess.run")
-    def test_adapter_not_found(self, mock_run):
-        """Returns NOT_FOUND when adapter doesn't exist."""
+    @patch("web.routes.performance.query_kismet_api")
+    def test_adapter_not_found(self, mock_api):
+        """Returns NOT_FOUND when Kismet API is unreachable."""
         from web.routes.performance import get_adapter_status
 
-        mock_run.return_value = MagicMock(returncode=1, stdout="")
+        # Simulate Kismet API failure
+        mock_api.return_value = {}
 
         result = get_adapter_status("wlan999")
         assert result == "NOT_FOUND"
 
-    @patch("subprocess.run")
-    def test_adapter_command_timeout(self, mock_run):
-        """Returns NOT_FOUND when command times out."""
+    @patch("web.routes.performance.query_kismet_api")
+    def test_adapter_command_timeout(self, mock_api):
+        """Returns NOT_FOUND when API query raises exception."""
         from web.routes.performance import get_adapter_status
 
-        mock_run.side_effect = subprocess.TimeoutExpired("ip", 2)
+        # Simulate timeout/exception from API
+        mock_api.side_effect = Exception("Connection timeout")
 
         result = get_adapter_status("wlan1")
         assert result == "NOT_FOUND"
@@ -363,50 +373,50 @@ class TestAdapterStatus:
 class TestCaptureRate:
     """Tests for get_capture_rate()."""
 
-    @patch("urllib.request.urlopen")
-    def test_capture_rate_success(self, mock_urlopen):
+    @patch("web.routes.performance.query_kismet_api")
+    def test_capture_rate_success(self, mock_api):
         """Returns capture rate from Kismet API."""
         from web.routes.performance import get_capture_rate
 
-        mock_response = MagicMock()
-        mock_response.read.return_value = b'{"kismet.system.packets_rrd":{"kismet.common.rrd.last_time":245.6}}'
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        # Simulate Kismet API response with packet rate
+        mock_api.return_value = {
+            "kismet.system.packets_rrd": {"kismet.common.rrd.last": 245.6}
+        }
 
         result = get_capture_rate()
         assert result == 245.6
 
-    @patch("urllib.request.urlopen")
-    def test_capture_rate_zero(self, mock_urlopen):
+    @patch("web.routes.performance.query_kismet_api")
+    def test_capture_rate_zero(self, mock_api):
         """Returns 0.0 when no packets."""
         from web.routes.performance import get_capture_rate
 
-        mock_response = MagicMock()
-        mock_response.read.return_value = b'{"kismet.system.packets_rrd":{"kismet.common.rrd.last_time":0}}'
-        mock_response.__enter__.return_value = mock_response
-        mock_urlopen.return_value = mock_response
+        # Simulate API response with zero packet rate
+        mock_api.return_value = {
+            "kismet.system.packets_rrd": {"kismet.common.rrd.last": 0}
+        }
 
         result = get_capture_rate()
         assert result == 0.0
 
-    @patch("urllib.request.urlopen")
-    def test_capture_rate_connection_error(self, mock_urlopen):
+    @patch("web.routes.performance.query_kismet_api")
+    def test_capture_rate_connection_error(self, mock_api):
         """Returns 0.0 when Kismet is unreachable."""
         from web.routes.performance import get_capture_rate
 
-        mock_urlopen.side_effect = OSError("Connection refused")
+        # Simulate API failure
+        mock_api.return_value = {}
 
         result = get_capture_rate()
         assert result == 0.0
 
-    @patch("urllib.request.urlopen")
-    def test_capture_rate_timeout(self, mock_urlopen):
-        """Returns 0.0 when request times out."""
+    @patch("web.routes.performance.query_kismet_api")
+    def test_capture_rate_timeout(self, mock_api):
+        """Returns 0.0 when API query raises exception."""
         from web.routes.performance import get_capture_rate
 
-        import socket
-
-        mock_urlopen.side_effect = socket.timeout("Request timed out")
+        # Simulate timeout exception
+        mock_api.side_effect = Exception("Request timed out")
 
         result = get_capture_rate()
         assert result == 0.0

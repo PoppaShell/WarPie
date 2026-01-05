@@ -1451,6 +1451,22 @@ KISMET_SITE_EOF
         log_success "Added ${#KISMET_EXCLUSIONS[@]} network exclusion(s) to Kismet site config"
     fi
 
+    # Generate Kismet API key for WarPie performance monitoring
+    log_info "Generating Kismet API key for WarPie..."
+    KISMET_API_KEY=$(openssl rand -hex 32)
+
+    # Store API key securely for web interface
+    echo "${KISMET_API_KEY}" > "${WARPIE_DIR}/kismet_api_key"
+    chmod 600 "${WARPIE_DIR}/kismet_api_key"
+    chown root:root "${WARPIE_DIR}/kismet_api_key"
+
+    # Add API key to Kismet site config
+    echo "" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+    echo "# WarPie API key for performance monitoring" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+    echo "httpd_api_key=${KISMET_API_KEY}" >> "${KISMET_CONF_DIR}/kismet_site.conf"
+
+    log_success "Kismet API key generated and configured"
+
     # Wardrive mode configuration (optimized for mobile scanning)
     cat > "${KISMET_CONF_DIR}/kismet_wardrive.conf" << 'WARDRIVE_EOF'
 # Wardrive Mode - Optimized for Mobile AP Scanning

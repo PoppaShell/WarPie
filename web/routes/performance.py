@@ -212,6 +212,51 @@ def get_cpu_load() -> list[float]:
 # =============================================================================
 
 
+def get_kismet_api_key() -> str:
+    """Read Kismet API key from secure storage.
+
+    Returns:
+        API key string, or empty string if not found.
+    """
+    try:
+        with open("/etc/warpie/kismet_api_key") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
+
+
+def query_kismet_api(endpoint: str) -> dict:
+    """Query Kismet REST API with authentication.
+
+    Args:
+        endpoint: API endpoint path (e.g., "/datasource/all_sources.json")
+
+    Returns:
+        JSON response as dict, or empty dict on failure.
+    """
+    try:
+        import json
+        import urllib.request
+
+        api_key = get_kismet_api_key()
+        if not api_key:
+            return {}
+
+        url = f"http://localhost:2501{endpoint}"
+        req = urllib.request.Request(
+            url,
+            headers={
+                "Cookie": f"KISMET={api_key}",
+                "Accept": "application/json",
+            },
+        )
+
+        with urllib.request.urlopen(req, timeout=2) as response:
+            return json.loads(response.read().decode())
+    except Exception:
+        return {}
+
+
 def get_gps_status() -> dict:
     """Get GPS status from gpspipe.
 
@@ -225,7 +270,7 @@ def get_gps_status() -> dict:
     try:
         # Use gpspipe to query gpsd for TPV (time-position-velocity) data
         result = subprocess.run(
-            ["gpspipe", "-w", "-n", "5"],
+            ["gpspipe", "-w", "-n", "10"],
             check=False,
             capture_output=True,
             text=True,
@@ -246,8 +291,8 @@ def get_gps_status() -> dict:
                     if data.get("class") == "TPV":
                         mode = data.get("mode", 0)
                     elif data.get("class") == "SKY":
-                        # Count satellites with signal
-                        satellites = len(data.get("satellites", []))
+                        # Use uSat (satellites used in fix) or nSat (total visible)
+                        satellites = data.get("uSat", data.get("nSat", 0))
                 except json.JSONDecodeError:
                     continue
 
@@ -275,34 +320,36 @@ def get_gps_status() -> dict:
 
 
 def get_adapter_status(interface: str) -> str:
-    """Get WiFi adapter status.
+    """Get WiFi adapter status from Kismet.
 
-    Checks if the specified interface (wlan1, wlan2) is UP.
+    Checks if the specified interface is active in Kismet as a datasource.
 
     Args:
         interface: Interface name (e.g., "wlan1", "wlan2")
 
     Returns:
-        "UP", "DOWN", or "NOT_FOUND"
+        "UP" if active in Kismet, "DOWN" if not active, "NOT_FOUND" if Kismet unreachable.
     """
     try:
-        result = subprocess.run(
-            ["ip", "link", "show", interface],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=2,
-        )
-
-        if result.returncode == 0:
-            # Parse output for state
-            # Example: 2: wlan1: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500
-            if "state UP" in result.stdout or ",UP," in result.stdout:
-                return "UP"
-            else:
-                return "DOWN"
-        else:
+        # Query Kismet datasources API
+        data = query_kismet_api("/datasource/all_sources.json")
+        if not data:
             return "NOT_FOUND"
+
+        # Check if interface is in the datasources list
+        for source in data:
+            # Kismet datasource names can be like "wlan1" or include the interface
+            source_name = source.get("kismet.datasource.name", "")
+            source_interface = source.get("kismet.datasource.interface", "")
+
+            # Check if this datasource matches our interface
+            if interface in source_name or interface in source_interface:
+                # Check if datasource is running (not errored or disabled)
+                running = source.get("kismet.datasource.running", False)
+                return "UP" if running else "DOWN"
+
+        # Interface not found in Kismet datasources
+        return "DOWN"
     except Exception:
         return "NOT_FOUND"
 
@@ -316,21 +363,26 @@ def get_capture_rate() -> float:
         Packets per second (float), or 0.0 on failure.
     """
     try:
-        import json
-        import urllib.request
+        # Query Kismet system status endpoint with authentication
+        data = query_kismet_api("/system/status.json")
+        if not data:
+            return 0.0
 
-        # Query Kismet system status endpoint
-        url = "http://localhost:2501/system/status.json"
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        # Extract packet rate from RRD data
+        # Try multiple possible locations in the API response
+        packets_rrd = data.get("kismet.system.packets_rrd", {})
 
-        with urllib.request.urlopen(req, timeout=2) as response:
-            data = json.loads(response.read().decode())
+        # Try to get the most recent packet rate from RRD
+        # The 'last' field contains the most recent value
+        pps = packets_rrd.get("kismet.common.rrd.last", 0)
 
-            # Extract packets per second from system status
-            # The exact field may vary; check Kismet API docs
-            pps = data.get("kismet.system.packets_rrd", {}).get("kismet.common.rrd.last_time", 0)
+        # If 'last' is 0, try getting from the minute vector (last element)
+        if pps == 0:
+            minute_vec = packets_rrd.get("kismet.common.rrd.minute_vec", [])
+            if minute_vec:
+                pps = minute_vec[-1] if isinstance(minute_vec, list) else 0
 
-            return round(float(pps), 1)
+        return round(float(pps), 1)
     except Exception:
         return 0.0
 
