@@ -1951,6 +1951,7 @@ PORT = 1337
 MODES = {
     "normal": {"name": "Normal Mode", "desc": "Full capture, home networks excluded", "env": "normal"},
     "wardrive": {"name": "Wardrive Mode", "desc": "Optimized AP-only scanning, faster channel hopping", "env": "wardrive"},
+    "wardrive_bt": {"name": "Wardrive+BT Mode", "desc": "Mobile capture with Bluetooth/BTLE scanning", "env": "wardrive_bt"},
     "": {"name": " Mode", "desc": "Target only  target devices", "env": ""}
 }
 
@@ -2140,6 +2141,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         <form method="POST" id="modeForm">
             <button type="submit" name="mode" value="normal" class="mode-btn normal {active_normal}">Normal Mode<div class="mode-desc">Full capture, home networks excluded from logs</div></button>
             <button type="submit" name="mode" value="wardrive" class="mode-btn wardrive {active_wardrive}">Wardrive Mode<div class="mode-desc">AP-only, fast scan, home excluded from logs</div></button>
+            <button type="submit" name="mode" value="wardrive_bt" class="mode-btn wardrive_bt {active_wardrive_bt}">Wardrive+BT Mode<div class="mode-desc">Mobile capture with Bluetooth/BTLE scanning</div></button>
             <button type="submit" name="mode" value="" class="mode-btn  {active_}"> Mode<div class="mode-desc">Only LOG custom targets (UI shows all)</div></button>
             <button type="submit" name="mode" value="stop" class="mode-btn stop">Stop Kismet<div class="mode-desc">Stop all capture</div></button>
         </form>
@@ -2262,8 +2264,9 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
             result = subprocess.run(['pgrep', '-a', 'kismet'], capture_output=True, text=True)
             if result.returncode == 0:
                 cmdline = result.stdout
-                if '--override ' in cmdline: return True, ''
+                if '--override wardrive_bt' in cmdline: return True, 'Wardrive+BT'
                 elif '--override wardrive' in cmdline: return True, 'Wardrive'
+                elif '--override ' in cmdline: return True, ''
                 else: return True, 'Normal'
             return False, 'Stopped'
         except: return False, 'Unknown'
@@ -2405,6 +2408,7 @@ class WarPieHandler(http.server.BaseHTTPRequestHandler):
             uptime=self.get_uptime(), host=host,
             active_normal='active' if current_mode == 'Normal' else '',
             active_wardrive='active' if current_mode == 'Wardrive' else '',
+            active_wardrive_bt='active' if current_mode == 'Wardrive+BT' else '',
             active_='active' if current_mode == '' else '')
         self.wfile.write(html.encode())
     
@@ -2739,15 +2743,14 @@ uninstall() {
     # -------------------------------------------------------------------------
     log_info "Removing monitor mode interfaces..."
     local mon_count=0
-    for iface in /sys/class/net/*mon*; do
-        if [[ -e "$iface" ]]; then
-            iface_name=$(basename "$iface")
-            if iw dev "$iface_name" del 2>/dev/null; then
-                log_success "Removed monitor interface: $iface_name"
-                ((mon_count++))
-            else
-                log_warn "Could not remove interface: $iface_name"
-            fi
+    # Use 'iw dev' to find ALL monitor interfaces (more reliable than filesystem globbing)
+    # This catches interfaces ending in "mon" from any source (Kismet, manual testing, etc.)
+    for iface in $(iw dev | grep -E '^\s+Interface.*mon$' | awk '{print $2}'); do
+        if iw dev "$iface" del 2>/dev/null; then
+            log_success "Removed monitor interface: $iface"
+            ((mon_count++))
+        else
+            log_warn "Could not remove interface: $iface"
         fi
     done
     if [[ $mon_count -eq 0 ]]; then
