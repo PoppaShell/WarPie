@@ -1,6 +1,6 @@
 [project]
 name = "warpie"
-version = "2.4.1"
+version = "2.5.0"
 description = "Raspberry Pi Wardriving Platform with Kismet integration"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
