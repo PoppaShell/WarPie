@@ -586,6 +586,10 @@ def configure_kismet_autostart() -> tuple[bool, str]:
                 "   → Optimized for mobile capture\n"
                 "   → Excludes home networks\n"
                 "   → Best for field deployment\n\n"
+                "[dim]□[/dim] [bold]Wardrive+BT[/bold]\n"
+                "   → Mobile capture with Bluetooth scanning\n"
+                "   → Includes WiFi + BT/BTLE devices\n"
+                "   → Higher resource usage\n\n"
                 "[dim]□[/dim] [bold]Normal[/bold]\n"
                 "   → Standard Kismet capture\n"
                 "   → No exclusions applied\n"
@@ -600,6 +604,7 @@ def configure_kismet_autostart() -> tuple[bool, str]:
 
         mode_choices = [
             {"name": "Wardrive - Optimized mobile capture (Recommended)", "value": "wardrive"},
+            {"name": "Wardrive+BT - Mobile capture with Bluetooth", "value": "wardrive_bt"},
             {"name": "Normal - Standard capture, no exclusions", "value": "normal"},
             {"name": "Targeted - OUI prefix filtering", "value": "targeted"},
         ]
@@ -615,6 +620,7 @@ def configure_kismet_autostart() -> tuple[bool, str]:
 
         mode_display = {
             "wardrive": "[green]Wardrive[/green] (mobile capture)",
+            "wardrive_bt": "[bright_magenta]Wardrive+BT[/bright_magenta] (mobile + Bluetooth)",
             "normal": "[yellow]Normal[/yellow] (standard capture)",
             "targeted": "[cyan]Targeted[/cyan] (OUI filtering)",
         }
