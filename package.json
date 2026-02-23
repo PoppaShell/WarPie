@@ -12,7 +12,7 @@
     "lint": "npm run lint:extract"
   },
   "devDependencies": {
-    "eslint": "^9.39.2",
+    "eslint": "^10.0.1",
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^30.2.0"
   },
