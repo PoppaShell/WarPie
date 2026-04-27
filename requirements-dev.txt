@@ -4,7 +4,7 @@
 # =============================================================================
 # Linting & Formatting
 # =============================================================================
-ruff>=0.8.0                    # Python linter and formatter (replaces black, isort, flake8)
+ruff>=0.15.12                    # Python linter and formatter (replaces black, isort, flake8)
 
 # =============================================================================
 # Testing
